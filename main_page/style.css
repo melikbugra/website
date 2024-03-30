@@ -1,0 +1,100 @@
+@import url("https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,200..1000;1,6..12,200..1000&display=swap");
+
+*,
+body {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: "Nunito Sans", sans-serif;
+    background-color: lightblue;
+
+    html {
+        scroll-behavior: smooth;
+    }
+}
+
+.resume-container {
+    display: flex;
+    height: min-content;
+    width: 100vw;
+}
+
+.header-container {
+    position: absolute;
+    width: 75vw;
+    top: 10%;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 10%;
+    display: flex;
+    flex-direction: column;
+    row-gap: 2rem;
+    box-shadow: -5px -3px 19px 8px #9d9b9b;
+    border-radius: 3%;
+}
+
+.img-container {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+}
+
+.info-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    row-gap: 2rem;
+    width: 100%;
+}
+
+.name {
+    font-size: clamp(1rem, 4vw, 4vw);
+}
+
+.big {
+    color: red;
+}
+
+nav {
+    align-self: center;
+    justify-self: center;
+}
+
+p {
+    font-size: clamp(12px, 2vw, 2vw);
+    text-align: justify;
+}
+
+a {
+    font-size: clamp(12px, 2vw, 2vw);
+    /* Responsive font size */
+    color: #007BFF;
+    /* A pleasant blue, common for links; adjust as needed */
+    text-decoration: none;
+    /* Removes underline */
+    background-color: transparent;
+    /* Ensures background is transparent */
+    transition: color 0.3s ease-in-out, text-decoration 0.3s ease-in-out;
+    /* Smooth transition for hover effects */
+}
+
+a:hover,
+a:focus {
+    color: #0056b3;
+    /* Darker shade of blue on hover/focus for better visibility */
+    text-decoration: underline;
+    /* Adds underline on hover/focus for visual feedback */
+    outline: none;
+    /* Removes the outline to keep the design clean */
+}
+
+.profile-photo {
+    width: 30%;
+    border-radius: 20%;
+}
+
+@media screen and (max-width: 720px) {
+    .header-container {
+        width: 100vw;
+    }
+}

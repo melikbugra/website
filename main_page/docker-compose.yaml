@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  main-page:
+    build: .
+    image: main_page:latest
+    container_name: main_page
+    restart: unless-stopped
+    networks:
+      - web
+
+networks:
+  web:
+    external: true
+    name: nginxproxymanager_default

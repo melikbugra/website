@@ -89,11 +89,6 @@ html {
     color: red;
 }
 
-nav {
-    align-self: center;
-    justify-self: center;
-}
-
 p {
     font-size: clamp(12px, 2vw, 2vw);
     text-align: justify;
@@ -125,6 +120,30 @@ a:focus {
 .profile-photo {
     width: 30%;
     border-radius: 20%;
+}
+  
+nav {
+position: absolute;
+top: 5%; /* Adjust as needed */
+left: 50%;
+transform: translateX(-50%);
+transition: all 0.3s ease;
+}
+
+nav ul {
+list-style: none;
+padding: 5%;
+display: flex;
+justify-content: center;
+
+}
+
+nav ul li {
+margin: 5% 5%;
+border-radius: 5px; /* Adjust as needed */
+box-shadow: -1px -1px 5px 2px #9d9b9b;
+border: 5%;
+padding: 0% 10%;
 }
 
 @media screen and (max-width: 720px) {

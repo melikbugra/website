@@ -37,7 +37,7 @@ html {
 }
 
 .item-container {
-    width: 60vw;
+    width: 100%;
     /* Adjust width as needed */
     padding: 2% 10%;
     /* Reduced vertical padding */
@@ -132,7 +132,7 @@ transition: all 0.3s ease;
 
 nav ul {
 list-style: none;
-padding: 5%;
+padding: 5% 5%;
 display: flex;
 justify-content: center;
 
@@ -150,4 +150,26 @@ padding: 0% 10%;
     .header-container {
         width: 100vw;
     }
+    nav {
+        position: relative;
+        top: 0;
+        left: 0;
+        transform: none;
+    }
+    nav ul {
+        list-style: none;
+        padding: 0% 5%;
+        display: flex;
+        justify-content: center;
+        
+        }
+        
+        nav ul li {
+        margin: 0% 5%;
+        border-radius: 5px; /* Adjust as needed */
+        box-shadow: -1px -1px 5px 2px #9d9b9b;
+        border: 5%;
+        padding: 0% 10%;
+        }
+        
 }

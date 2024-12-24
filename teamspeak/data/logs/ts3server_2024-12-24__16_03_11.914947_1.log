@@ -3,3 +3,6 @@
 2024-12-24 16:03:12.766488|WARNING |VirtualServer |1  |ServerAdmin privilege key created, please use the line below
 2024-12-24 16:03:12.766562|WARNING |VirtualServer |1  |token=YqsjAdFjpp+6Nkewwlr4mRMRLZ+RCQAD1ScJT+5O
 2024-12-24 16:03:12.766670|WARNING |VirtualServer |1  |--------------------------------------------------------
+2024-12-24 17:02:47.822414|INFO    |VirtualServer |1  |client 'melikbugra'(id:3) was added to servergroup 'Server Admin'(id:6) by client 'server'(id:0)
+2024-12-24 17:02:47.823893|INFO    |VirtualServer |1  |client 'melikbugra'(id:3) used privilege key 'YqsjAdFjpp+6Nkewwlr4mRMRLZ+RCQAD1ScJT+5O' and was added to servergroup 'Server Admin'(id:6)
+2024-12-24 17:12:30.998451|INFO    |VirtualServer |1  |client 'pispiyade'(id:6) was added to servergroup 'Server Admin'(id:6) by client 'melikbugra'(id:3)

@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  teamspeak:
+    image: teamspeak
+    container_name: teamspeak_server
+    restart: always
+    ports:
+      - "9987:9987/udp" # Voice communication
+      - "10011:10011" # ServerQuery (telnet)
+      - "30033:30033" # File transfers
+    volumes:
+      - ./data:/var/ts3server # Persistent data storage
+    environment:
+      TS3SERVER_LICENSE: accept # Required to accept the TeamSpeak license
+      TS3SERVER_LOGGING: 0 # Disable logging
+
+networks:
+  web:
+    external: true
+    name: nginxproxymanager_default

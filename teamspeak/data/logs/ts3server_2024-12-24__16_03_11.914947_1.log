@@ -1,0 +1,5 @@
+2024-12-24 16:03:12.765403|INFO    |VirtualServerBase|1  |listening on 0.0.0.0:9987, [::]:9987
+2024-12-24 16:03:12.766371|WARNING |VirtualServer |1  |--------------------------------------------------------
+2024-12-24 16:03:12.766488|WARNING |VirtualServer |1  |ServerAdmin privilege key created, please use the line below
+2024-12-24 16:03:12.766562|WARNING |VirtualServer |1  |token=YqsjAdFjpp+6Nkewwlr4mRMRLZ+RCQAD1ScJT+5O
+2024-12-24 16:03:12.766670|WARNING |VirtualServer |1  |--------------------------------------------------------

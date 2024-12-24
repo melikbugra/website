@@ -1,15 +1,19 @@
-docker run --rm -v ovpn-data:/etc/openvpn kylemanna/openvpn ovpn_genconfig -u udp://195.201.98.37
-docker run --rm -it -v ovpn-data:/etc/openvpn kylemanna/openvpn ovpn_initpki
+docker run --rm -v ./ovpn-data:/etc/openvpn kylemanna/openvpn ovpn_genconfig -u udp://195.201.98.37
+docker run --rm -it -v ./ovpn-data:/etc/openvpn kylemanna/openvpn ovpn_initpki
+docker run --rm -v ./ovpn-data:/etc/openvpn kylemanna/openvpn ovpn_genkey > ./openvpn-data/pki/ta.key
 
-docker run -it --rm -v ovpn-data:/etc/openvpn kylemanna/openvpn easyrsa build-client-full melikpc nopass
-docker run --rm -v ovpn-data:/etc/openvpn kylemanna/openvpn ovpn_getclient melikpc > melikpc.ovpn
-scp root@195.201.98.37:/root/website/vpn/melikpc.ovpn .
-
-
-
-sudo ufw allow 1194/udp
+Enable IP Forwarding: Edit /etc/sysctl.conf to ensure the following line is uncommented:
 net.ipv4.ip_forward=1
+
+Apply the changes:
 sudo sysctl -p
+
 sudo iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o eth0 -j MASQUERADE
+
 sudo apt install iptables-persistent
 sudo netfilter-persistent save
+
+docker run -it --rm -v ./ovpn-data:/etc/openvpn kylemanna/openvpn easyrsa build-client-full melikpc nopass
+docker run --rm -v ./ovpn-data:/etc/openvpn kylemanna/openvpn ovpn_getclient melikpc > melikpc.ovpn
+scp root@195.201.98.37:/root/website/vpn/melikpc.ovpn .
+

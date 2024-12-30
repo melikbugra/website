@@ -1,11 +1,11 @@
-version: '3.8'
-
 services:
   mlflow-server:
     image: mlflow-server
+    build: .
     container_name: mlflow-server
-    # ports:
-    #   - 5000:5000
+    volumes:
+      - ./mlruns:/usr/src/app/mlruns
+      - ./mlflow.db:/usr/src/app/mlflow.db
     networks:
       - web
 

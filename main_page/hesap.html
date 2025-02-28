@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TEB Bank Faiz Hesaplama Aracı</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 300px;
+            text-align: center;
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        .input-group .checkbox-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .input-group .checkbox-container label {
+            margin-left: 5px;
+        }
+
+        .button {
+            background-color: #007BFF;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .button:hover {
+            background-color: #0056b3;
+        }
+
+        .result {
+            margin-top: 20px;
+            font-size: 18px;
+            color: #333;
+            white-space: pre-line;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>TEB Bank Faiz Hesaplama Aracı</h1>
+        <div class="input-group">
+            <label for="amount">Hesap Bakiyesi (TL):</label>
+            <input type="number" id="amount" placeholder="Hesap bakiyesini girin">
+        </div>
+        <div class="input-group">
+            <label for="days">Faiz Değerlendirme Gün Sayısı:</label>
+            <input type="number" id="days" placeholder="Gün sayısını girin">
+        </div>
+        <div class="input-group checkbox-container">
+            <input type="checkbox" id="fundCheckbox">
+            <label for="fundCheckbox">Fon alıyor musunuz?</label>
+        </div>
+        <button class="button" onclick="calculateInterest()">Faiz Hesapla</button>
+        <div class="result" id="result"></div>
+    </div>
+
+    <script>
+        function calculateInterest() {
+            const amount = parseFloat(document.getElementById('amount').value);
+            const days = parseInt(document.getElementById('days').value);
+            const fundCheckbox = document.getElementById('fundCheckbox').checked;
+            let baseInterestRate = 0;
+            let rateDescription = "";
+
+            if (amount >= 5000 && amount <= 9999) {
+                baseInterestRate = 0.07;
+                rateDescription = "%7";
+                notIncludedAmount = 5000;
+            } else if (amount <= 24999) {
+                baseInterestRate = 0.07;
+                rateDescription = "%7";
+                notIncludedAmount = 5000;
+            } else if (amount <= 49999) {
+                baseInterestRate = 0.07;
+                rateDescription = "%7";
+                notIncludedAmount = 5000;
+            } else if (amount <= 99999) {
+                baseInterestRate = 0.085;
+                rateDescription = "%8.5";
+                notIncludedAmount = 7500;
+            } else if (amount <= 249999) {
+                baseInterestRate = 0.245;
+                rateDescription = "%24.5";
+                notIncludedAmount = 15000;
+            } else if (amount <= 499999) {
+                baseInterestRate = 0.405;
+                rateDescription = "%40.5";
+                notIncludedAmount = 30000;
+            } else if (amount <= 749999) {
+                baseInterestRate = 0.405;
+                rateDescription = "%40.5";
+                notIncludedAmount = 50000;
+            } else if (amount <= 999999) {
+                baseInterestRate = 0.41;
+                rateDescription = "%41";
+                notIncludedAmount = 50000;
+            } else if (amount <= 1499999) {
+                baseInterestRate = 0.425;
+                rateDescription = "%42.5";
+                notIncludedAmount = 125000;
+            } else if (amount <= 1999999) {
+                baseInterestRate = 0.425;
+                rateDescription = "%42.5";
+                notIncludedAmount = 150000;
+            } else if (amount <= 2999999) {
+                baseInterestRate = 0.425;
+                rateDescription = "%42.5";
+                notIncludedAmount = 200000;
+            } else if (amount <= 4000000) {
+                baseInterestRate = 0.425;
+                rateDescription = "%42.5";
+                notIncludedAmount = 250000;
+            }
+
+            // Fon alınıyorsa ek %0.5 faiz ekleniyor
+            const interestRate = fundCheckbox ? baseInterestRate + 0.005 : baseInterestRate;
+            // Günlük brüt faiz hesaplaması
+            const dailyInterest = ((amount - notIncludedAmount) * interestRate) / 365;
+            // Toplam brüt faiz
+            const totalInterest = dailyInterest * days;
+            // Stopaj oranı %12 olarak uygulanıyor
+            const taxRate = 0.15;
+            const taxAmount = totalInterest * taxRate;
+            // Stopaj sonrası net faiz
+            const netTotalInterest = totalInterest - taxAmount;
+
+            document.getElementById('result').innerText =
+                `Toplam Faiz (Stopaj Öncesi): ${totalInterest.toFixed(2)} TL\n` +
+                `Stopaj (%15): ${taxAmount.toFixed(2)} TL\n` +
+                `Net Faiz (Stopaj Sonrası): ${netTotalInterest.toFixed(2)} TL\n` +
+                `Faiz Oranı: ${rateDescription} ${fundCheckbox ? '+ %0.5' : ''}`;
+        }
+    </script>
+</body>
+
+</html>

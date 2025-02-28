@@ -10,7 +10,7 @@ services:
       - web
 
   optuna-db:
-    image: postgres:latest
+    image: postgres:16
     environment:
       POSTGRES_DB: optuna
       POSTGRES_USER: optuna

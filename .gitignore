@@ -1,3 +1,6 @@
 **/*.log*
 **/*.ovpn
 vpn/ovpn-data
+mlflow/data
+nginxproxymanager/data
+nginxproxymanager/letsencrypt

@@ -1,0 +1,50 @@
+services:
+  keycloak-db:
+    image: docker.io/bitnami/postgresql:16.3.0
+    restart: unless-stopped
+    environment:
+      POSTGRESQL_USERNAME: bn_keycloak
+      POSTGRESQL_PASSWORD: IkcjMk2T0LtgDG1Bdy9PJmAgrPT
+      POSTGRESQL_DATABASE: bitnami_keycloak
+    volumes:
+      - 'keycloak_db_data:/bitnami/postgresql'
+    networks:
+      - web
+  keycloak:
+    image: docker.io/bitnami/keycloak:latest
+    container_name: keycloak
+    environment:
+      # KEYCLOAK_CREATE_ADMIN_USER: "true"
+      KEYCLOAK_DATABASE_HOST: keycloak-db
+      KEYCLOAK_DATABASE_NAME: bitnami_keycloak
+      KEYCLOAK_DATABASE_USER: bn_keycloak
+      KEYCLOAK_DATABASE_PASSWORD: IkcjMk2T0LtgDG1Bdy9PJmAgrPT
+      KEYCLOAK_ADMIN: keycloakadminmelikserver
+      KEYCLOAK_ADMIN_PASSWORD: kqOSVFPkdBg19kStp0TjMwqnUjg
+
+      KEYCLOAK_ENABLE_HTTPS: false
+      KEYCLOAK_HOSTNAME: auth.melikbugraozcelik.com
+      KEYCLOAK_HOSTNAME_PORT: "8080"
+      # KEYCLOAK_PROXY_HEADERS: xforwarded
+      KEYCLOAK_ENABLE_HTTP_PORT: yes
+      KEYCLOAK_HTTP_PORT: "8080"
+      # KC_PROXY: edge
+      # KEYCLOAK_PROXY_MODE: edge
+      KEYCLOAK_PROXY_HEADERS: xforwarded
+    ports:
+      - 8080:8080
+    volumes:
+      - keycloak_data:/opt/keycloak/data
+    restart: unless-stopped
+    networks:
+      - web
+
+volumes:
+  keycloak_data:
+  keycloak_db_data:
+
+
+networks:
+  web:
+    external: true
+    name: nginxproxymanager_default

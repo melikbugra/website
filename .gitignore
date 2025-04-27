@@ -4,3 +4,5 @@ vpn/ovpn-data
 mlflow/data
 nginxproxymanager/data
 nginxproxymanager/letsencrypt
+owncast/data
+teamspeak/data

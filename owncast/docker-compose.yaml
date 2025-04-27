@@ -1,0 +1,16 @@
+version: "3"
+services:
+  owncast:
+    image: owncast/owncast:latest
+    ports:
+      - "8181:8080"
+      - "1935:1935"
+    volumes:
+      - ./data:/app/data
+    networks:
+      - web
+
+networks:
+  web:
+    external: true
+    name: nginxproxymanager_default

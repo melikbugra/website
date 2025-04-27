@@ -5,7 +5,7 @@ services:
     container_name: mlflow-server
     volumes:
       - ./mlruns:/usr/src/app/mlruns
-      - ./mlflow.db:/usr/src/app/mlflow.db
+      # - ./mlflow.db:/usr/src/app/mlflow.db
     networks:
       - web
 

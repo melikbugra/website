@@ -21,7 +21,29 @@ style: |
   }
 math: mathjax
 ---
+<style>
+img[alt~="center"] {
+  position: absolute;
+  top: 130px;
+  right: 130px;
+}
+</style>
 
+<style>
+img[alt~="center-plot"] {
+  position: absolute;
+  top: 300px;
+  right: 130px;
+}
+</style>
+
+<style>
+img[alt~="top-right"] {
+  position: absolute;
+  top: 120px;
+  right: 30px;
+}
+</style>
 # Adversarial Reinforcement Learning
 
 Melik Buğra Özçelik
@@ -48,13 +70,7 @@ Date: -
 
 ---
 
-<style>
-img[alt~="top-right"] {
-  position: absolute;
-  top: 120px;
-  right: 30px;
-}
-</style>
+
 
 ## Key Concepts
 
@@ -205,6 +221,49 @@ def get_adversary_reward(
 
 ---
 
+## Evaluation
+
+![width:1000px center](checkpoint5.gif)
+
+---
+
+## Evaluation
+
+![width:1000px center](checkpoint10.gif)
+
+---
+
+## Evaluation
+
+![width:1000px center](checkpoint25.gif)
+
+---
+## Evaluation
+
+![width:1000px center](checkpoint45.gif)
+
+---
+## Evaluation
+
+![width:1000px center](checkpoint130.gif)
+
+---
+## Evaluation
+
+![width:1000px center](checkpoint185.gif)
+
+---
+## Episode Returns while Adversary Training
+
+![width:1000px center-plot](adv_train.png)
+
+---
+## Episode Returns while Protagonist Training
+
+![width:1000px center-plot](prt_train.png)
+
+---
+
 <!-- Split content -->
 <div class="columns">
 <div>
@@ -231,7 +290,48 @@ def get_adversary_reward(
 
 ---
 
+## Novel Idea 1: Adversary Rewarded by the Change in State-Value (ΔV)
+
+
+
+---
+
+## Novel Idea 2: Scaling Adversarial Reward by Protagonist’s Policy Entropy
+
+- **Entropy** measures how uncertain the protagonist's policy is at state $s_t$
+  - **Low entropy:** Protagonist is confident, adversarial reward increases
+  - **High entropy:** Protagonist is uncertain, adversarial reward decreases
+- This idea balances and stabilizes the training
+---
+
+## Literature for idea 2: [Tactics of Adversarial Attack on Deep Reinforcement Learning Agents](https://arxiv.org/abs/1703.06748)
+
+- Instead of using entropy explicitly in the reward, they choose when to attack based on protagonist policy uncertainty:
+
+  - **Similarity:**
+    - Both ideas exploit protagonist's uncertainty/confidence
+  - **Difference:**
+    - They do not scale rewards explicitly by entropy; instead, their timing strategy implicitly leverages the same intuition (targeting low-entropy states)
+---
+
+## Literature for idea 2: [Deceptive Reinforcement Learning Under Adversarial Manipulations on Cost Signals](https://arxiv.org/abs/1906.10571)
+
+- Instead of using entropy formula directly, they use Q value difference between actions for the same state:
+  - $\text{trigger attack if } \max_{a, a'} \left| Q(s, a) - Q(s, a') \right| > \epsilon$
+
+  - **Similarity:**
+    - A large difference in Q-values (one action clearly better than others) means low entropy
+    - Attacks are only triggered when protagonist is highly confident, so both out and their methods learns to drive the protagonist in to low entropy states
+
+---
+
 # Thank You!
 
 Questions?
+
+<div style="text-align: center; margin-top: 40px;">
+
+## [Demo Video](https://melikbugraozcelik.com/slides/adversarial-rl/adv_rl.mp4)
+
+</div>
 

@@ -6,3 +6,6 @@ nginxproxymanager/data
 nginxproxymanager/letsencrypt
 owncast/data
 teamspeak/data
+**/*.mp4
+**/*.gif
+**/*.png

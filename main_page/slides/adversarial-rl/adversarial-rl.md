@@ -50,6 +50,17 @@ img[alt~="top-right"] {
   right: 30px;
 }
 </style>
+
+<style>
+.video-container {
+  position: absolute;
+  top: 180px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 800px;
+}
+</style>
+
 # Adversarial Reinforcement Learning
 
 Melik Buğra Özçelik
@@ -64,6 +75,7 @@ Date: -
 - Related Work
 - Proposed Idea/Method
 - First Results
+- Novelty Discussion
 
 ---
 
@@ -72,7 +84,10 @@ Date: -
 - What is Adversarial Reinforcement Learning?
 - Adversary Types:
     1. Internal
+      - Applying disturbance/perturbation to the actions
     2. External
+      - Separate adversary agent takes the protagonist to a challenging state
+      - Separate adversary agent creates the state (Procedural content generation)
 
 ---
 
@@ -288,7 +303,7 @@ def get_adversary_reward(
 
 - Applying one (or some) of the methods to the robot stirring problem
 - Finalizing the literature review
-- Depending on the novelty of the idea, choosing and appropriate conference
+- Depending on the novelty of the idea, choosing an appropriate conference
 - Final trainings and preparing the paper
 
 </div>
@@ -432,13 +447,17 @@ section {
 
 ---
 
+## Demo Video
+<div class="video-container">
+<video controls width="800">
+  <source src="adv_rl.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
+</div>
+
+---
+
 # Thank You!
 
 Questions?
-
-<div style="text-align: center; margin-top: 40px;">
-
-## [Demo Video](https://melikbugraozcelik.com/slides/adversarial-rl/adv_rl.mp4)
-
-</div>
 

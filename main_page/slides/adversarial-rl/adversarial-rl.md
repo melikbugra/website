@@ -19,6 +19,12 @@ style: |
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 1rem;
   }
+  table {
+    font-size: 18px;
+  }
+  th, td {
+    padding: 4px 8px;
+  }
 math: mathjax
 ---
 <style>
@@ -291,13 +297,60 @@ def get_adversary_reward(
 ---
 
 ## Novel Idea 1: Adversary Rewarded by the Change in State-Value (ΔV)
+$$
+r_{\text{adv}}(s_{t-1}, s_t) = V(s_{t-1}) - V(s_t)
+$$
+- Explicitly defines the adversary’s immediate reward based on the difference in the protagonist's estimated state values between two consecutive states
+- The adversary gets positively rewarded for actions that lead the protagonist from a higher-value state to a lower-value state
+- Unlike cumulative-return-based or direct-value-based adversarial objectives, this explicitly rewards incremental "value degradation," potentially improving training stability and consistency of the adversary’s behavior
+
+---
+
+## Literature for idea 1: [Robust Adversarial Reinforcement Learning](https://arxiv.org/abs/1703.02702)
+
+- Adversary explicitly tries to minimize protagonist’s cumulative return:
+  - $\max_{\pi_p} \min_{\pi_a} \mathbb{E} \left[ \sum_{t=0}^{T} r(s_t, a_t^p, a_t^a) \right]$
 
 
+  - **Similarity:**
+    - Both ideas seek to reduce protagonist’s overall performance (value)
+  - **Difference:**
+    - Our approach uses explicit immediate ΔV per transition, RARL uses cumulative return
+---
+
+## Literature for idea 1: [Robust Deep Reinforcement Learning with Adversarial Attacks](https://arxiv.org/abs/1712.03632)
+
+- Perturbations computed via gradients directly targeting protagonist’s Q-values, explicitly minimizing protagonist’s Q-value (similar intuition, different mechanism):
+  - $\max_{\pi_p} \min_{\pi_a} \mathbb{E} \left[ \sum_{t=0}^{T} r(s_t, a_t^p, a_t^a) \right]$
+
+
+  - **Similarity:**
+    - Both ideas directly target protagonist's state values
+  - **Difference:**
+    - Our  method explicitly defines adversary's step-wise reward using ΔV, whereas this approach directly perturbs inputs to minimize Q-values (not explicit ΔV)
+---
+## Literature for idea 1: [Tactics of Adversarial Attack on Deep Reinforcement Learning Agents](https://arxiv.org/abs/1703.06748)
+
+- Attacks exploit protagonist’s confident (low-entropy) action selection, forcing low-value outcomes:
+  - $a_{\text{attack}}(s) = \arg\min_a \pi_p(a \mid s)$
+
+  - **Similarity:**
+    - Both ideas intuitively aim at decreasing protagonist’s value at confident moments
+  - **Difference:**
+    - No explicit immediate ΔV used; adversary picks worst action rather than explicitly rewarded by state-value differences
+---
+| Paper                                 | Reward formulation                                  | Immediate ΔV explicitly used?     | Similarity                                    | Difference                                       |                        |
+| ------------------------------------- | --------------------------------------------------- | --------------------------------- | --------------------------------------------- | ------------------------------------------------ | ---------------------- |
+| **RARL (Pinto et al.)**               | $\min_{\pi_a}\sum r(s,a)$ cumulative                | No                              | Both adversaries reduce protagonist’s returns | Uses cumulative returns, not immediate ΔV        |                        |
+| **Gradient Attack (Pattanaik)**       | $\max_{\delta}-Q(s+\delta,a)$ direct Q-minimization | No                              | Targets protagonist’s Q-value directly        | Not immediate per-step ΔV reward                 |                        |
+| **Strategically-timed Attacks (Lin)** | $\arg\min_a \pi_p(a \mid s)$,                              |  implicit worst-action choice | No                                          | Implicitly causes value drop at confident states | Not explicit ΔV reward |
 
 ---
 
 ## Novel Idea 2: Scaling Adversarial Reward by Protagonist’s Policy Entropy
-
+$$
+r_{\text{adv}}(s_{t-1}, s_t) = \Delta V(s_{t-1}, s_t) \cdot \frac{\beta}{\beta + H(\pi_{\text{p}}(\cdot \mid s_t))}
+$$
 - **Entropy** measures how uncertain the protagonist's policy is at state $s_t$
   - **Low entropy:** Protagonist is confident, adversarial reward increases
   - **High entropy:** Protagonist is uncertain, adversarial reward decreases
@@ -316,12 +369,66 @@ def get_adversary_reward(
 
 ## Literature for idea 2: [Deceptive Reinforcement Learning Under Adversarial Manipulations on Cost Signals](https://arxiv.org/abs/1906.10571)
 
+<style scoped>
+section {
+  font-size: 22px;
+}
+</style>
+
 - Instead of using entropy formula directly, they use Q value difference between actions for the same state:
   - $\text{trigger attack if } \max_{a, a'} \left| Q(s, a) - Q(s, a') \right| > \epsilon$
 
   - **Similarity:**
     - A large difference in Q-values (one action clearly better than others) means low entropy
     - Attacks are only triggered when protagonist is highly confident, so both out and their methods learns to drive the protagonist in to low entropy states
+  - **Difference:**
+    - No explicit entropy used; their "confidence measure" is Q-value spread rather than entropy
+    - The adversary either fully triggers or doesn't (binary decision), while our idea smoothly scales reward by entropy
+---
+
+## Literature for idea 2: [Emergent Complexity and Zero-shot Transfer via Unsupervised Environment Design](https://arxiv.org/abs/2012.02096)
+<style scoped>
+section {
+  font-size: 22px;
+}
+</style>
+- An environment-designing adversary tries to maximize the *regret* of the protagonist compared to a second ("antagonist") agent:
+  - $r_{adv} = \text{Regret} = V_{antagonist} - V_{protagonist}$
+
+  - **Similarity:**
+    - Both methods dynamically adjust adversarial pressure based on protagonist’s capability
+    - "Regret" implicitly scales difficulty: if protagonist struggles significantly (high regret), adversary is rewarded greatly. This implicitly ensures the adversary chooses problems at the edge of protagonist ability (related to protagonist uncertainty/confidence)
+  - **Difference:**
+    - They use regret (performance gap) between two agents rather than entropy explicitly
+    - Our method directly and explicitly utilizes entropy, giving clearer control
+---
+
+## Literature for idea 2: [Robust Adversarial Reinforcement Learning via Bounded Rationality Curricula](https://arxiv.org/abs/2311.01642)
+<style scoped>
+section {
+  font-size: 22px;
+}
+</style>
+- They train the adversary with entropy regularization on the adversary’s policy itself:
+  - $J(\pi) = \mathbb{E} \left[ \sum_t r_t - \tau H(\pi(\cdot \mid s_t)) \right]$
+  - where $\tau$ is the temperature coefficient controlling the strength of the entropy term
+
+  - **Similarity:**
+    - Both methods explicitly use entropy, but QARL applies entropy to the adversary itself, controlling adversary "difficulty"
+    - Both methods ensure adversarial pressure is adaptive: softer initially and increasing gradually as training progresses
+  - **Difference:**
+    - They scale by adversary's entropy, not protagonist’s
+    - Our approach directly ties adversarial reward to protagonist’s confidence rather than controlling adversary’s policy softness
+    
+---
+
+| Paper                    | Explicitly uses entropy?               | Whose entropy?                        | How entropy/confidence used?                                 | Similarity             | Difference             |
+| ------------------------ | -------------------------------------- | ------------------------------------- | ------------------------------------------------------------ | --------------------------------------- | ----------------------------------------- |
+| **Lin et al. (2017)**    | No (implicit)                        | Protagonist                           | Timing attacks when entropy low                              | Adversary impactful in confident states | No explicit scaling of reward             |
+| **Huang & Zhu (2020)**   | No (implicit)                        | Protagonist (implicitly via Q-values) | Triggering attacks when large Q-gap                          | Adversary impactful in confident states | Binary trigger, no smooth entropy scaling |
+| **Dennis et al. (2020)** | No (implicit via regret)             | Protagonist (implicitly via regret)   | Difficulty scales implicitly with protagonist ability        | Dynamic difficulty adaptation           | No explicit entropy measure               |
+| **Reddi et al. (2024)**  | Yes (explicitly entropy-regularized) | Adversary                             | Gradually adjusts adversarial strength via adversary entropy | Adaptive adversary pressure             | Uses adversary entropy, not protagonist’s |
+
 
 ---
 

@@ -2,178 +2,555 @@
 <html lang="tr">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TEB Bank Faiz Hesaplama Aracı</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Peşin mi Taksit mi? — Günlük Getiri ile Fırsat Maliyeti Hesaplayıcı</title>
     <style>
+        :root {
+            --bg: #0b1020;
+            /* koyu lacivert */
+            --panel: #121936;
+            /* kart arka plan */
+            --muted: #9fb0ffcc;
+            --text: #eaf0ff;
+            --accent: #7aa2ff;
+            /* mavi vurgu */
+            --success: #39d98a;
+            /* yeşil */
+            --danger: #ff6b6b;
+            /* kırmızı */
+            --warning: #ffd166;
+            /* sarı */
+            --shadow: 0 10px 30px rgba(0, 0, 0, .35), inset 0 1px 0 rgba(255, 255, 255, .03);
+            --radius: 20px;
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        html,
         body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f9;
+            height: 100%
+        }
+
+        body {
             margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
+            font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+            color: var(--text);
+            background: radial-gradient(1200px 600px at 80% -10%, #1b2450 0%, transparent 60%), radial-gradient(800px 500px at -10% 120%, #18224a 0%, transparent 60%), var(--bg);
+            line-height: 1.4;
         }
 
         .container {
-            background-color: #fff;
+            max-width: 1100px;
+            margin: 40px auto;
+            padding: 0 16px
+        }
+
+        header {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 12px;
+            justify-content: space-between;
+            margin-bottom: 18px
+        }
+
+        .title {
+            font-size: clamp(22px, 3.8vw, 36px);
+            font-weight: 800;
+            letter-spacing: .2px
+        }
+
+        .subtitle {
+            color: var(--muted);
+            font-size: 14px
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1.1fr .9fr;
+            gap: 18px
+        }
+
+        @media (max-width:960px) {
+            .grid {
+                grid-template-columns: 1fr
+            }
+        }
+
+        .card {
+            background: linear-gradient(180deg, rgba(255, 255, 255, .04), rgba(255, 255, 255, .02));
+            border: 1px solid rgba(255, 255, 255, .06);
+            border-radius: var(--radius);
             padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            width: 300px;
-            text-align: center;
+            box-shadow: var(--shadow)
         }
 
-        h1 {
-            color: #333;
+        .card h3 {
+            margin: 0 0 12px;
+            font-size: 18px
         }
 
-        .input-group {
-            margin-bottom: 15px;
+        .row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px
         }
 
-        .input-group label {
+        .row3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px
+        }
+
+        @media (max-width:720px) {
+
+            .row,
+            .row3 {
+                grid-template-columns: 1fr
+            }
+        }
+
+        label {
+            font-size: 13px;
+            color: var(--muted);
             display: block;
-            margin-bottom: 5px;
-            color: #555;
+            margin-bottom: 6px
         }
 
-        .input-group input {
+        input,
+        select {
             width: 100%;
-            padding: 8px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
+            padding: 12px 14px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, .08);
+            outline: none;
+            background: #0d1330;
+            color: var(--text);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04)
         }
 
-        .input-group .checkbox-container {
+        input::placeholder {
+            color: #95a3ff66
+        }
+
+        .hint {
+            font-size: 12px;
+            color: var(--muted);
+            margin-top: 6px
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 14px
+        }
+
+        button {
+            appearance: none;
+            border: none;
+            cursor: pointer;
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-weight: 700;
+            letter-spacing: .2px;
+            color: #0a0f24;
+            background: linear-gradient(180deg, var(--accent), #567df5);
+            box-shadow: 0 8px 22px rgba(122, 162, 255, .35);
+        }
+
+        button.secondary {
+            background: #1a2250;
+            color: var(--text);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05)
+        }
+
+        .kpi {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px
+        }
+
+        @media (max-width:960px) {
+            .kpi {
+                grid-template-columns: 1fr
+            }
+        }
+
+        .kpi .item {
+            background: #0e1536;
+            border: 1px solid rgba(255, 255, 255, .06);
+            border-radius: 16px;
+            padding: 14px
+        }
+
+        .kpi .label {
+            font-size: 12px;
+            color: var(--muted)
+        }
+
+        .kpi .value {
+            font-size: 22px;
+            font-weight: 800;
+            margin-top: 6px
+        }
+
+        .good {
+            color: var(--success)
+        }
+
+        .bad {
+            color: var(--danger)
+        }
+
+        .neutral {
+            color: var(--warning)
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            overflow: hidden;
+            border-radius: 12px
+        }
+
+        thead th {
+            font-size: 12px;
+            color: var(--muted);
+            text-align: left;
+            padding: 10px 12px;
+            background: #0d1330;
+            position: sticky;
+            top: 0
+        }
+
+        tbody td {
+            padding: 10px 12px;
+            border-top: 1px solid rgba(255, 255, 255, .06)
+        }
+
+        tbody tr:hover {
+            background: rgba(122, 162, 255, .06)
+        }
+
+        .footer-note {
+            color: var(--muted);
+            font-size: 12px;
+            margin-top: 12px
+        }
+
+        .switch {
             display: flex;
             align-items: center;
-            justify-content: center;
+            gap: 8px;
+            margin-top: 8px
         }
 
-        .input-group .checkbox-container label {
-            margin-left: 5px;
+        .switch input {
+            width: auto
         }
 
-        .button {
-            background-color: #007BFF;
-            color: white;
-            padding: 10px 15px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-
-        .button:hover {
-            background-color: #0056b3;
-        }
-
-        .result {
-            margin-top: 20px;
-            font-size: 18px;
-            color: #333;
-            white-space: pre-line;
+        .pill {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 11px;
+            background: #0d1330;
+            border: 1px solid rgba(255, 255, 255, .08);
+            color: var(--muted)
         }
     </style>
 </head>
 
 <body>
     <div class="container">
-        <h1>TEB Bank Faiz Hesaplama Aracı</h1>
-        <div class="input-group">
-            <label for="amount">Hesap Bakiyesi (TL):</label>
-            <input type="number" id="amount" placeholder="Hesap bakiyesini girin">
+        <header>
+            <div>
+                <div class="title">Peşin mi? Taksit mi? <span class="pill">Günlük Getiri ile Kıyasla</span></div>
+                <div class="subtitle">Peşin fiyat, taksit toplamı ve günlük net getirinle fırsat maliyeti bazlı etkin
+                    maliyeti hesapla.</div>
+            </div>
+        </header>
+
+        <div class="grid">
+            <section class="card">
+                <h3>🔢 Girdiler</h3>
+                <div class="row">
+                    <div>
+                        <label>Peşin Fiyat (TL)</label>
+                        <input type="number" id="cashPrice" placeholder="Örn: 47500" value="47500" min="0"
+                            step="0.01" />
+                    </div>
+                    <div>
+                        <label>Taksitli Toplam Fiyat (TL)</label>
+                        <input type="number" id="installmentTotal" placeholder="Örn: 55000" value="55000" min="0"
+                            step="0.01" />
+                    </div>
+                </div>
+                <div class="row3">
+                    <div>
+                        <label>Taksit Sayısı</label>
+                        <input type="number" id="installmentCount" placeholder="Örn: 3" value="3" min="1" step="1" />
+                    </div>
+                    <div>
+                        <label>Başlangıç Tarihi (alışveriş tarihi)</label>
+                        <input type="date" id="startDate" />
+                        <div class="hint">Varsayılan: bugün</div>
+                    </div>
+                    <div>
+                        <label>Kredi Kartı <b>Son Ödeme Günü</b> (ay içindeki gün)</label>
+                        <input type="number" id="dueDay" placeholder="Örn: 8" value="8" min="1" max="28" />
+                    </div>
+                </div>
+                <div class="row">
+                    <div>
+                        <label>Günlük <b>net</b> getiri (%)</label>
+                        <input type="number" id="dailyRatePct" placeholder="Örn: 0.06" value="0.06" step="0.0001" />
+                        <div class="hint">Örn: 0.06 → günlük 0.06% (0.0006 oran). Stopaj sonrası neti gir.</div>
+                    </div>
+                    <div>
+                        <label>Detay Seçenekleri</label>
+                        <div class="switch">
+                            <input type="checkbox" id="showAdvanced" />
+                            <label for="showAdvanced">Gelişmiş ayarları göster</label>
+                        </div>
+                    </div>
+                </div>
+                <div id="advanced" class="row" style="display:none; margin-top:6px">
+                    <div>
+                        <label>Hesap Kesim Günü (statement) <span class="pill">Opsiyonel</span></label>
+                        <input type="number" id="statementDay" value="28" min="1" max="28" />
+                        <div class="hint">Satın alma tarihi kesim gününden <u>önce</u> ise ilk son ödeme tarihi bir
+                            sonraki ay; <u>sonra</u> ise +2 ay.</div>
+                    </div>
+                    <div>
+                        <label>Gün/365 bileşik mi?</label>
+                        <select id="compoundingMode">
+                            <option value="daily" selected>Günlük bileşik (1+r)^gün</option>
+                            <option value="simple">Basit faiz (r×gün)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="actions">
+                    <button id="calcBtn">Hesapla</button>
+                    <button class="secondary" id="resetBtn">Sıfırla</button>
+                </div>
+            </section>
+
+            <section class="card">
+                <h3>📌 Sonuç Özeti</h3>
+                <div class="kpi" id="kpi">
+                    <div class="item">
+                        <div class="label">Peşin Efektif Maliyet</div>
+                        <div class="value" id="cashEff">—</div>
+                    </div>
+                    <div class="item">
+                        <div class="label">Taksit+Fon Efektif Maliyet</div>
+                        <div class="value" id="instEff">—</div>
+                    </div>
+                    <div class="item">
+                        <div class="label">Karar</div>
+                        <div class="value" id="decision">—</div>
+                    </div>
+                </div>
+                <div class="footer-note">Efektif maliyet: ürün bedeli ± fon getirileri ± fırsat maliyeti.</div>
+            </section>
         </div>
-        <div class="input-group">
-            <label for="days">Faiz Değerlendirme Gün Sayısı:</label>
-            <input type="number" id="days" placeholder="Gün sayısını girin">
-        </div>
-        <div class="input-group checkbox-container">
-            <input type="checkbox" id="fundCheckbox">
-            <label for="fundCheckbox">Fon alıyor musunuz?</label>
-        </div>
-        <button class="button" onclick="calculateInterest()">Faiz Hesapla</button>
-        <div class="result" id="result"></div>
+
+        <section class="card" style="margin-top:18px">
+            <h3>🧾 Nakit Akışı ve Getiri Detayı</h3>
+            <div class="row">
+                <div>
+                    <h4 style="margin:8px 0 6px">Peşin Senaryo (A)</h4>
+                    <table id="tableA">
+                        <thead>
+                            <tr>
+                                <th>Dönem</th>
+                                <th>Gün</th>
+                                <th>Başlangıç (TL)</th>
+                                <th>Getiri</th>
+                                <th>Toplam</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div>
+                    <h4 style="margin:8px 0 6px">Taksit + Fon Senaryo (B)</h4>
+                    <table id="tableB">
+                        <thead>
+                            <tr>
+                                <th>Dönem</th>
+                                <th>Gün</th>
+                                <th>Başlangıç (TL)</th>
+                                <th>Getiri</th>
+                                <th>Ödeme</th>
+                                <th>Kalan</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <p class="footer-note">Not: Bu araç varsayımsal ve eğitim amaçlıdır; gerçek fon getirileri ve bankacılık
+            kuralları değişkenlik gösterebilir.</p>
     </div>
 
     <script>
-        function calculateInterest() {
-            const amount = parseFloat(document.getElementById('amount').value);
-            const days = parseInt(document.getElementById('days').value);
-            const fundCheckbox = document.getElementById('fundCheckbox').checked;
-            let baseInterestRate = 0;
-            let rateDescription = "";
+        (function () {
+            const fmtTL = n => isFinite(n) ? n.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }) : '—';
+            const clampDay = d => Math.max(1, Math.min(28, d | 0));
 
-            if (amount >= 5000 && amount <= 9999) {
-                baseInterestRate = 0.07;
-                rateDescription = "%7";
-                notIncludedAmount = 5000;
-            } else if (amount <= 24999) {
-                baseInterestRate = 0.07;
-                rateDescription = "%7";
-                notIncludedAmount = 5000;
-            } else if (amount <= 49999) {
-                baseInterestRate = 0.07;
-                rateDescription = "%7";
-                notIncludedAmount = 5000;
-            } else if (amount <= 99999) {
-                baseInterestRate = 0.085;
-                rateDescription = "%8.5";
-                notIncludedAmount = 7500;
-            } else if (amount <= 249999) {
-                baseInterestRate = 0.245;
-                rateDescription = "%24.5";
-                notIncludedAmount = 15000;
-            } else if (amount <= 499999) {
-                baseInterestRate = 0.405;
-                rateDescription = "%40.5";
-                notIncludedAmount = 30000;
-            } else if (amount <= 749999) {
-                baseInterestRate = 0.405;
-                rateDescription = "%40.5";
-                notIncludedAmount = 50000;
-            } else if (amount <= 999999) {
-                baseInterestRate = 0.41;
-                rateDescription = "%41";
-                notIncludedAmount = 50000;
-            } else if (amount <= 1499999) {
-                baseInterestRate = 0.425;
-                rateDescription = "%42.5";
-                notIncludedAmount = 125000;
-            } else if (amount <= 1999999) {
-                baseInterestRate = 0.425;
-                rateDescription = "%42.5";
-                notIncludedAmount = 150000;
-            } else if (amount <= 2999999) {
-                baseInterestRate = 0.425;
-                rateDescription = "%42.5";
-                notIncludedAmount = 200000;
-            } else if (amount <= 4000000) {
-                baseInterestRate = 0.425;
-                rateDescription = "%42.5";
-                notIncludedAmount = 250000;
+            const addMonthsSafe = (date, m, dayPref) => {
+                const d = new Date(date.getTime());
+                const targetMonth = d.getMonth() + m;
+                const y = d.getFullYear() + Math.floor(targetMonth / 12);
+                const mo = ((targetMonth % 12) + 12) % 12;
+                const day = clampDay(dayPref ?? d.getDate());
+                const res = new Date(y, mo, 1);
+                const last = new Date(y, mo + 1, 0).getDate();
+                res.setDate(Math.min(day, Math.min(28, last))); // 29-31 sapmalarını önle
+                return res;
             }
 
-            // Fon alınıyorsa ek %0.5 faiz ekleniyor
-            const interestRate = fundCheckbox ? baseInterestRate + 0.005 : baseInterestRate;
-            // Günlük brüt faiz hesaplaması
-            const dailyInterest = ((amount - notIncludedAmount) * interestRate) / 365;
-            // Toplam brüt faiz
-            const totalInterest = dailyInterest * days;
-            // Stopaj oranı %12 olarak uygulanıyor
-            const taxRate = 0.15;
-            const taxAmount = totalInterest * taxRate;
-            // Stopaj sonrası net faiz
-            const netTotalInterest = totalInterest - taxAmount;
+            const daysBetween = (a, b) => Math.max(0, Math.round((b - a) / (1000 * 60 * 60 * 24)));
 
-            document.getElementById('result').innerText =
-                `Toplam Faiz (Stopaj Öncesi): ${totalInterest.toFixed(2)} TL\n` +
-                `Stopaj (%15): ${taxAmount.toFixed(2)} TL\n` +
-                `Net Faiz (Stopaj Sonrası): ${netTotalInterest.toFixed(2)} TL\n` +
-                `Faiz Oranı: ${rateDescription} ${fundCheckbox ? '+ %0.5' : ''}`;
-        }
+            const nextDueDate = (purchaseDate, dueDay, statementDay = 28) => {
+                // Eğer alışveriş günü kesim gününden <= ise: ilk due = bir sonraki ay dueDay
+                // değilse: ilk due = iki ay sonra dueDay
+                const pd = new Date(purchaseDate.getFullYear(), purchaseDate.getMonth(), purchaseDate.getDate());
+                const sd = clampDay(statementDay);
+                const dd = clampDay(dueDay);
+                const firstMonthShift = (pd.getDate() <= sd) ? 1 : 2;
+                return addMonthsSafe(pd, firstMonthShift, dd);
+            }
+
+            const compound = (principal, dailyRate, days, mode = 'daily') => {
+                if (days <= 0 || principal <= 0) return { gain: 0, total: principal };
+                if (mode === 'simple') {
+                    const gain = principal * (dailyRate * days);
+                    return { gain, total: principal + gain };
+                } else {
+                    const total = principal * Math.pow(1 + dailyRate, days);
+                    return { gain: total - principal, total };
+                }
+            }
+
+            // DOM
+            const $ = sel => document.querySelector(sel);
+            const cashPriceEl = $('#cashPrice');
+            const instTotalEl = $('#installmentTotal');
+            const instCountEl = $('#installmentCount');
+            const startDateEl = $('#startDate');
+            const dueDayEl = $('#dueDay');
+            const dailyRatePctEl = $('#dailyRatePct'); const showAdvancedEl = $('#showAdvanced');
+            const statementDayEl = $('#statementDay');
+            const compModeEl = $('#compoundingMode');
+            const cashEffEl = $('#cashEff');
+            const instEffEl = $('#instEff');
+            const decisionEl = $('#decision');
+            const tableA = $('#tableA tbody');
+            const tableB = $('#tableB tbody');
+
+            // Defaults
+            const today = new Date();
+            startDateEl.valueAsDate = today;
+
+            showAdvancedEl.addEventListener('change', () => {
+                $('#advanced').style.display = showAdvancedEl.checked ? 'grid' : 'none';
+            });
+
+            $('#resetBtn').addEventListener('click', () => {
+                cashPriceEl.value = 47500;
+                instTotalEl.value = 55000;
+                instCountEl.value = 3;
+                startDateEl.valueAsDate = new Date();
+                dueDayEl.value = 8;
+                dailyRatePctEl.value = 0.06; showAdvancedEl.checked = false; $('#advanced').style.display = 'none';
+                statementDayEl.value = 28;
+                compModeEl.value = 'daily';
+                tableA.innerHTML = tableB.innerHTML = '';
+                cashEffEl.textContent = instEffEl.textContent = decisionEl.textContent = '—';
+            });
+
+            $('#calcBtn').addEventListener('click', () => {
+                const cashPrice = Number(cashPriceEl.value) || 0;
+                const instTotal = Number(instTotalEl.value) || 0;
+                const n = Math.max(1, Number(instCountEl.value) || 1);
+                const start = startDateEl.value ? new Date(startDateEl.value) : new Date();
+                const dueDay = clampDay(Number(dueDayEl.value) || 8);
+                const dailyRate = (Number(dailyRatePctEl.value) || 0) / 100; // yüzdeyi orana çevirconst statementDay = clampDay(Number(statementDayEl.value)||28);
+                const compMode = compModeEl.value;
+
+                // --- Senaryo A: Peşin (fırsat maliyeti = cashPrice, alıştan son taksite kadar)
+                // Son taksit tarihi, firstDue + (n-1) ay
+                const firstDue = nextDueDate(start, dueDay, statementDay);
+                const lastDue = addMonthsSafe(firstDue, n - 1, dueDay);
+                const daysA = daysBetween(start, lastDue);
+                const aComp = compound(cashPrice, dailyRate, daysA, compMode);
+                const cashEff = cashPrice + aComp.gain; // ürün + fırsat maliyeti
+
+                // Tablo A
+                tableA.innerHTML = '';
+                const rowA = document.createElement('tr');
+                rowA.innerHTML = `<td>Alış → Son Taksit (${start.toLocaleDateString('tr-TR')} → ${lastDue.toLocaleDateString('tr-TR')})</td>` +
+                    `<td>${daysA}</td><td>${fmtTL(cashPrice)}</td><td>${fmtTL(aComp.gain)}</td><td>${fmtTL(aComp.total)}</td>`;
+                tableA.appendChild(rowA);
+
+                // --- Senaryo B: Taksit + Fon (başlangıç sermaye = cashPrice)
+                const instAmt = instTotal / n;
+                let fund = cashPrice;
+                let cursor = start;
+                let totalGain = 0; tableB.innerHTML = '';
+
+                for (let k = 0; k < n; k++) {
+                    const due = addMonthsSafe(firstDue, k, dueDay);
+                    const days = daysBetween(cursor, due);
+                    const before = fund;
+                    const comp = compound(Math.max(0, fund), dailyRate, days, compMode); // negatifte getiri yok
+                    fund = (fund > 0 ? comp.total : fund); // negatifse aynı kalsın
+                    const gain = (fund > 0 ? comp.gain : 0);
+                    totalGain += gain;
+
+                    // ödeme
+                    fund -= instAmt;
+                    if (fund < 0) { fund = 0; }
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `<td>${k + 1}. dönem (${cursor.toLocaleDateString('tr-TR')} → ${due.toLocaleDateString('tr-TR')})</td>` +
+                        `<td>${days}</td>` +
+                        `<td>${fmtTL(before)}</td>` +
+                        `<td>${fmtTL(gain)}</td>` +
+                        `<td>-${fmtTL(instAmt)}</td>` +
+                        `<td>${fmtTL(fund)}</td>`;
+                    tableB.appendChild(tr);
+                    cursor = due;
+                }
+
+                const instEff = instTotal - totalGain;
+
+                cashEffEl.textContent = fmtTL(cashEff);
+                instEffEl.textContent = fmtTL(instEff);
+
+                // Karar
+                let decTxt = '';
+                let cls = '';
+                if (instEff < cashEff - 1e-6) {
+                    decTxt = `Taksit + Fon daha avantajlı (≈ ${fmtTL(cashEff - instEff)} fark)`; cls = 'good';
+                } else if (cashEff < instEff - 1e-6) {
+                    decTxt = `Peşin daha avantajlı (≈ ${fmtTL(instEff - cashEff)} fark)`; cls = 'good';
+                } else {
+                    decTxt = 'Başa baş'; cls = 'neutral';
+                }
+                decisionEl.textContent = decTxt;
+                decisionEl.className = 'value ' + cls;
+            });
+        })();
     </script>
 </body>
 

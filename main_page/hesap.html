@@ -281,19 +281,18 @@
                 <div class="row">
                     <div>
                         <label>Peşin Fiyat (TL)</label>
-                        <input type="number" id="cashPrice" placeholder="Örn: 47500" value="47500" min="0"
-                            step="0.01" />
+                        <input type="number" id="cashPrice" placeholder="Örn: 100000" value="0" min="0" step="0.01" />
                     </div>
                     <div>
                         <label>Taksitli Toplam Fiyat (TL)</label>
-                        <input type="number" id="installmentTotal" placeholder="Örn: 55000" value="55000" min="0"
+                        <input type="number" id="installmentTotal" placeholder="Örn: 110000" value="0" min="0"
                             step="0.01" />
                     </div>
                 </div>
                 <div class="row3">
                     <div>
                         <label>Taksit Sayısı</label>
-                        <input type="number" id="installmentCount" placeholder="Örn: 3" value="3" min="1" step="1" />
+                        <input type="number" id="installmentCount" placeholder="Örn: 3" value="0" min="1" step="1" />
                     </div>
                     <div>
                         <label>Başlangıç Tarihi (alışveriş tarihi)</label>
@@ -302,14 +301,14 @@
                     </div>
                     <div>
                         <label>Kredi Kartı <b>Son Ödeme Günü</b> (ay içindeki gün)</label>
-                        <input type="number" id="dueDay" placeholder="Örn: 8" value="8" min="1" max="28" />
+                        <input type="number" id="dueDay" placeholder="Örn: 8" value="1" min="1" max="28" />
                     </div>
                 </div>
                 <div class="row">
                     <div>
                         <label>Günlük <b>net</b> getiri (%)</label>
-                        <input type="number" id="dailyRatePct" placeholder="Örn: 0.06" value="0.06" step="0.0001" />
-                        <div class="hint">Örn: 0.06 → günlük 0.06% (0.0006 oran). Stopaj sonrası neti gir.</div>
+                        <input type="number" id="dailyRatePct" placeholder="Örn: 0.06" value="0.00" step="0.0001" />
+                        <div class="hint">Örn: 0.05 → günlük 0.05%. Stopaj sonrası neti gir.</div>
                     </div>
                     <div>
                         <label>Detay Seçenekleri</label>
@@ -348,7 +347,7 @@
                         <div class="value" id="cashEff">—</div>
                     </div>
                     <div class="item">
-                        <div class="label">Taksit+Fon Efektif Maliyet</div>
+                        <div class="label">Taksit Efektif Maliyet</div>
                         <div class="value" id="instEff">—</div>
                     </div>
                     <div class="item">
@@ -356,7 +355,7 @@
                         <div class="value" id="decision">—</div>
                     </div>
                 </div>
-                <div class="footer-note">Efektif maliyet: ürün bedeli ± fon getirileri ± fırsat maliyeti.</div>
+                <div class="footer-note">Efektif maliyet: ürün bedeli ± getiriler ± fırsat maliyeti.</div>
             </section>
         </div>
 
@@ -364,7 +363,7 @@
             <h3>🧾 Nakit Akışı ve Getiri Detayı</h3>
             <div class="row">
                 <div>
-                    <h4 style="margin:8px 0 6px">Peşin Senaryo (A)</h4>
+                    <h4 style="margin:8px 0 6px">Peşin Senaryo</h4>
                     <table id="tableA">
                         <thead>
                             <tr>
@@ -379,7 +378,7 @@
                     </table>
                 </div>
                 <div>
-                    <h4 style="margin:8px 0 6px">Taksit + Fon Senaryo (B)</h4>
+                    <h4 style="margin:8px 0 6px">Taksit Senaryo</h4>
                     <table id="tableB">
                         <thead>
                             <tr>
@@ -397,8 +396,7 @@
             </div>
         </section>
 
-        <p class="footer-note">Not: Bu araç varsayımsal ve eğitim amaçlıdır; gerçek fon getirileri ve bankacılık
-            kuralları değişkenlik gösterebilir.</p>
+        <p class="footer-note">Not: Bu araç varsayımsal ve eğitim amaçlıdır.</p>
     </div>
 
     <script>
@@ -459,19 +457,22 @@
 
             // Defaults
             const today = new Date();
-            startDateEl.valueAsDate = today;
+            const localOffset = today.getTimezoneOffset() * 60000;
+            const localISOTime = new Date(today - localOffset).toISOString().split('T')[0];
+            startDateEl.value = localISOTime;
+
 
             showAdvancedEl.addEventListener('change', () => {
                 $('#advanced').style.display = showAdvancedEl.checked ? 'grid' : 'none';
             });
 
             $('#resetBtn').addEventListener('click', () => {
-                cashPriceEl.value = 47500;
-                instTotalEl.value = 55000;
-                instCountEl.value = 3;
+                cashPriceEl.value = 0;
+                instTotalEl.value = 0;
+                instCountEl.value = 0;
                 startDateEl.valueAsDate = new Date();
-                dueDayEl.value = 8;
-                dailyRatePctEl.value = 0.06; showAdvancedEl.checked = false; $('#advanced').style.display = 'none';
+                dueDayEl.value = 1;
+                dailyRatePctEl.value = 0.00; showAdvancedEl.checked = false; $('#advanced').style.display = 'none';
                 statementDayEl.value = 28;
                 compModeEl.value = 'daily';
                 tableA.innerHTML = tableB.innerHTML = '';
@@ -502,7 +503,7 @@
                     `<td>${daysA}</td><td>${fmtTL(cashPrice)}</td><td>${fmtTL(aComp.gain)}</td><td>${fmtTL(aComp.total)}</td>`;
                 tableA.appendChild(rowA);
 
-                // --- Senaryo B: Taksit + Fon (başlangıç sermaye = cashPrice)
+
                 const instAmt = instTotal / n;
                 let fund = cashPrice;
                 let cursor = start;
@@ -541,7 +542,7 @@
                 let decTxt = '';
                 let cls = '';
                 if (instEff < cashEff - 1e-6) {
-                    decTxt = `Taksit + Fon daha avantajlı (≈ ${fmtTL(cashEff - instEff)} fark)`; cls = 'good';
+                    decTxt = `Taksit daha avantajlı (≈ ${fmtTL(cashEff - instEff)} fark)`; cls = 'good';
                 } else if (cashEff < instEff - 1e-6) {
                     decTxt = `Peşin daha avantajlı (≈ ${fmtTL(instEff - cashEff)} fark)`; cls = 'good';
                 } else {

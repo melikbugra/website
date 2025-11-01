@@ -22,3 +22,17 @@ docker run --rm -v ./ovpn-data:/etc/openvpn kylemanna/openvpn ovpn_getclient mel
 scp root@195.201.98.37:/root/website/vpn/melikpc.ovpn .
 
 
+docker run --rm -v "$PWD/ovpn-data":/etc/openvpn kylemanna/openvpn \
+  ovpn_genconfig \
+  -u udp://195.201.98.37 \
+  -n 1.1.1.1 -n 9.9.9.9 \
+  -p "redirect-gateway def1" \
+  -C "AES-256-GCM" -a "SHA256"
+
+init-pki complete; you may now create a CA or requests.
+Your newly created PKI dir is: /etc/openvpn/pki
+
+
+Using SSL: openssl OpenSSL 1.1.1g  21 Apr 2020
+
+Enter New CA Key Passphrase: 

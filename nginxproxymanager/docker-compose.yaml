@@ -10,6 +10,7 @@ services:
       - '81:81' # Admin Web Port
       # Add any other Stream port you want to expose
       # - '21:21' # FTP
+      - '15432:15432'
     environment:
       # Mysql/Maria connection parameters:
       DB_MYSQL_HOST: "db"
@@ -17,8 +18,8 @@ services:
       DB_MYSQL_USER: "adminmelik"
       DB_MYSQL_PASSWORD: "rejjov-8vucve-rynkeJ"
       DB_MYSQL_NAME: "dbmelik"
-      # Uncomment this if IPv6 is not enabled on your host
-      # DISABLE_IPV6: 'true'
+    # Uncomment this if IPv6 is not enabled on your host
+    # DISABLE_IPV6: 'true'
     volumes:
       - ./data:/data
       - ./letsencrypt:/etc/letsencrypt

@@ -4,6 +4,7 @@ vpn/ovpn-data
 mlflow/data
 nginxproxymanager/data
 nginxproxymanager/letsencrypt
+nginxproxymanager/mysql
 owncast/data
 teamspeak/data
 **/*.mp4

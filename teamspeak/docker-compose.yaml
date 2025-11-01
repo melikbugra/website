@@ -1,19 +1,49 @@
 version: '3.8'
 
 services:
-  teamspeak:
-    image: teamspeak
-    container_name: teamspeak_server
-    restart: always
+  # ts3:
+  #   image: teamspeak
+  #   container_name: teamspeak_server
+  #   restart: always
+  #   ports:
+  #     - "9987:9987/udp"
+  #     - "10011:10011"
+  #     - "30033:30033"
+  #   volumes:
+  #     - ./data:/var/ts3server
+  #   environment:
+  #     TS3SERVER_LICENSE: accept
+  #     TS3SERVER_LOGGING: 0
+  #   networks:
+  #     - web
+
+  ts6:
+    image: teamspeaksystems/teamspeak6-server:latest
+    container_name: teamspeak6_server
+    restart: unless-stopped
     ports:
-      - "9987:9987/udp" # Voice communication
-      - "10011:10011" # ServerQuery (telnet)
-      - "30033:30033" # File transfers
-    volumes:
-      - ./data:/var/ts3server # Persistent data storage
+      - "9987:9987/udp"     # TS6'yı geçici farklı bir dış porta bağla
+      - "30033:30033/tcp"   # (çakışma olmasın)
+      - "10080:10080/tcp"  # Web Query istersen aç
     environment:
-      TS3SERVER_LICENSE: accept # Required to accept the TeamSpeak license
-      TS3SERVER_LOGGING: 0 # Disable logging
+      - TSSERVER_LICENSE_ACCEPTED=accept
+    volumes:
+      - ./data-ts6:/var/tsserver   # TS6 için ayrı ve boş bir dizin
+    networks:
+      - web
+
+  log-cleaner:
+    image: alpine:latest
+    container_name: ts6_log_cleaner
+    volumes:
+      - ./data-ts6:/var/tsserver
+    command: >
+      sh -c "while true; do
+               echo '[CLEANER] removing logs at $(date)';
+               rm -rf /var/tsserver/logs/*;
+               sleep 432000;  # 5 days
+             done"
+    restart: unless-stopped
 
 networks:
   web:

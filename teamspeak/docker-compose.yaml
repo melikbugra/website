@@ -18,7 +18,7 @@ services:
   #     - web
 
   ts6:
-    image: teamspeaksystems/teamspeak6-server:latest
+    image: teamspeaksystems/teamspeak6-server:v6.0.0-beta7
     container_name: teamspeak6_server
     restart: unless-stopped
     ports:

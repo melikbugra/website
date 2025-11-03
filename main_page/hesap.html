@@ -572,23 +572,18 @@
 
                 const firstDue = nextDueDate(start, dueDay, statementDay);
                 const lastDue = addMonthsSafe(firstDue, n - 1, dueDay);
-                const daysA = daysBetween(start, lastDue);
-                const aGross = compoundGross(cashPrice, dailyRate, daysA, compMode);
-                const aGainNet = aGross.gainGross * (1 - taxRate);
-                const cashEff = cashPrice + aGainNet;
 
-                tableA.innerHTML = '';
-                const rowA = document.createElement('tr');
-                rowA.innerHTML = `
-          <td>Alış → Son Taksit (${start.toLocaleDateString('tr-TR')} → ${lastDue.toLocaleDateString('tr-TR')})</td>
-          <td>${daysA}</td>
-          <td>${fmtTL(cashPrice)}</td>
-          <td>${fmtTL(aGainNet)}</td>
-          <td>${fmtTL(cashEff)}</td>`;
-                tableA.appendChild(rowA);
+                // Peşin (kredi kartıyla tek çekim): nakit, ilk son ödeme gününe kadar fonda kalır
+                const daysCashEarn = daysBetween(start, firstDue);
+                const grossCash = compoundGross(cashPrice, dailyRate, daysCashEarn, compMode);
+                const netEarnedUntilFirstDue = grossCash.gainGross * (1 - taxRate);
 
+                // Peşin efektif maliyet başlangıç değeri (kazanç düşülür)
+                let cashEffValue = cashPrice - netEarnedUntilFirstDue;
+
+                // Taksit akışı ve toplam net getiri
                 const instAmt = n > 0 ? instTotal / n : instTotal;
-                let fund = cashPrice; let cursor = start; let totalGainNet = 0; tableB.innerHTML = '';
+                let fund = cashPrice; let cursor = start; let totalGainNet = 0; const gains = []; tableB.innerHTML = '';
                 for (let k = 0; k < n; k++) {
                     const due = addMonthsSafe(firstDue, k, dueDay);
                     const d = daysBetween(cursor, due);
@@ -597,7 +592,7 @@
                     const gainGross = (fund > 0 ? comp.gainGross : 0);
                     const tax = gainGross * taxRate;
                     const gainNet = gainGross - tax;
-                    totalGainNet += gainNet;
+                    totalGainNet += gainNet; gains.push(gainNet);
                     let afterTax = (fund > 0 ? fund + gainGross - tax : fund);
                     let afterPay = afterTax - instAmt; if (afterPay < 0) afterPay = 0;
                     const tr = document.createElement('tr');
@@ -611,14 +606,39 @@
                     tableB.appendChild(tr);
                     fund = afterPay; cursor = due;
                 }
-                const instEff = instTotal - totalGainNet;
 
-                cashEffEl.textContent = fmtTL(cashEff);
-                instEffEl.textContent = fmtTL(instEff);
+                // İlk son ödeme sonrası kaçırılan getiri (peşin alırsan artık fonda kalamaz)
+                const missedAfterFirst = Math.max(0, totalGainNet - (gains[0] || 0));
+                const daysAfter = daysBetween(firstDue, lastDue);
+                cashEffValue += missedAfterFirst; // kaçırılan eklenir
+
+                // Peşin tablo: iki satır (kazanılan ve kaçırılan getiri)
+                const r1 = document.createElement('tr');
+                r1.innerHTML = `
+          <td>Alış → İlk Son Ödeme (${start.toLocaleDateString('tr-TR')} → ${firstDue.toLocaleDateString('tr-TR')})</td>
+          <td>${daysCashEarn}</td>
+          <td>${fmtTL(cashPrice)}</td>
+          <td>${fmtTL(netEarnedUntilFirstDue)}</td>
+          <td>—</td>`;
+                const r2 = document.createElement('tr');
+                r2.innerHTML = `
+          <td>İlk Son Ödeme → Son Taksit (${firstDue.toLocaleDateString('tr-TR')} → ${lastDue.toLocaleDateString('tr-TR')})</td>
+          <td>${daysAfter}</td>
+          <td>—</td>
+          <td>-${fmtTL(missedAfterFirst)}</td>
+          <td>${fmtTL(cashEffValue)}</td>`;
+                tableA.innerHTML = '';
+                tableA.appendChild(r1);
+                tableA.appendChild(r2);
+
+                const instEffValue = instTotal - totalGainNet;
+
+                cashEffEl.textContent = fmtTL(cashEffValue);
+                instEffEl.textContent = fmtTL(instEffValue);
 
                 let decTxt = '', cls = '';
-                if (instEff < cashEff - 1e-6) { decTxt = `Taksit daha avantajlı (≈ ${fmtTL(cashEff - instEff)} fark)`; cls = 'good'; }
-                else if (cashEff < instEff - 1e-6) { decTxt = `Peşin daha avantajlı (≈ ${fmtTL(instEff - cashEff)} fark)`; cls = 'good'; }
+                if (instEffValue < cashEffValue - 1e-6) { decTxt = `Taksit daha avantajlı (≈ ${fmtTL(cashEffValue - instEffValue)} fark)`; cls = 'good'; }
+                else if (cashEffValue < instEffValue - 1e-6) { decTxt = `Peşin daha avantajlı (≈ ${fmtTL(instEffValue - cashEffValue)} fark)`; cls = 'good'; }
                 else { decTxt = 'Başa baş'; cls = 'neutral'; }
                 decisionEl.textContent = decTxt; decisionEl.className = 'value ' + cls;
             });
@@ -679,6 +699,20 @@
                 // Hesaplamayı otomatik tetikle
                 document.getElementById('calcBtn').click();
             });
+
+            // ===== Basit duman testleri (console) =====
+            (function smokeTests() {
+                try {
+                    console.group('%cSmoke Tests', 'color:#7aa2ff;font-weight:bold');
+                    console.assert(daysBetween(new Date(2025, 0, 1), new Date(2025, 0, 1)) === 0, 'daysBetween same day');
+                    console.assert(daysBetween(new Date(2025, 0, 1), new Date(2025, 0, 2)) === 1, 'daysBetween +1');
+                    const d = addMonthsSafe(new Date(2025, 0, 31), 1, 31); // Şubat sonu güvenli
+                    console.assert(d.getDate() <= 28, 'addMonthsSafe caps day to ≤28');
+                    const dg = computeDailyGross('monthly_effective', 0.03, 30, 365);
+                    console.assert(isFinite(dg) && dg > 0, 'computeDailyGross monthly_effective');
+                    console.groupEnd();
+                } catch (e) { console.error('Smoke test failed', e); }
+            })();
 
         })();
     </script>

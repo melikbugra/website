@@ -17,6 +17,8 @@ function moveButton() {
     hayirBtn.style.position = 'fixed';
     hayirBtn.style.left = randomX + 'px';
     hayirBtn.style.top = randomY + 'px';
+    hayirBtn.style.right = 'auto';
+    hayirBtn.style.bottom = 'auto';
 }
 
 // Masaüstü için

@@ -8,60 +8,66 @@ body {
     background-color: #fce4ec;
     font-family: 'Comic Sans MS', 'Comic Sans', cursive;
     overflow: hidden;
+    touch-action: manipulation;
 }
 
 .container {
     text-align: center;
     background: white;
-    padding: 3rem;
+    padding: 2rem;
     border-radius: 30px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
     position: relative;
-    max-width: 90%;
+    max-width: 85%;
     border: 5px solid #d81b60;
 }
 
 .emoji-header {
-    font-size: 3rem;
+    font-size: 2.5rem;
     margin-bottom: 1rem;
 }
 
 h1 {
     color: #d81b60;
-    font-size: 2.5rem;
+    font-size: 1.8rem;
     margin-bottom: 2rem;
 }
 
 .buttons {
     display: flex;
     justify-content: center;
-    gap: 20px;
-    min-height: 50px;
+    gap: 15px;
+    min-height: 60px;
+    position: relative;
 }
 
 button {
-    padding: 15px 40px;
-    font-size: 1.5rem;
+    padding: 12px 30px;
+    font-size: 1.2rem;
     font-family: inherit;
     border: none;
     border-radius: 15px;
     cursor: pointer;
     transition: transform 0.1s;
+    white-space: nowrap;
 }
 
 #evet-btn {
     background-color: #4caf50;
     color: white;
+    z-index: 2;
 }
 
-#evet-btn:hover {
-    transform: scale(1.1);
+#evet-btn:active {
+    transform: scale(0.9);
 }
 
 #hayir-btn {
     background-color: #f44336;
     color: white;
     position: absolute;
+    /* Başlangıçta sağda durması için */
+    right: 0;
 }
 
 .hidden {
@@ -88,19 +94,9 @@ button {
     bottom: -100px;
     width: 60px;
     height: 80px;
-    background: #ff4081;
     border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%;
     animation: up 5s linear forwards;
     z-index: 10;
-}
-
-.balloon::after {
-    content: "🎈";
-    font-size: 2rem;
-    position: absolute;
-    bottom: -10px;
-    left: 10px;
-    opacity: 0.2;
 }
 
 @keyframes up {
@@ -114,5 +110,20 @@ button {
 
     100% {
         transform: translateY(-120vh) rotate(-10deg);
+    }
+}
+
+@media (min-width: 600px) {
+    h1 {
+        font-size: 2.5rem;
+    }
+
+    .emoji-header {
+        font-size: 3rem;
+    }
+
+    button {
+        padding: 15px 40px;
+        font-size: 1.5rem;
     }
 }

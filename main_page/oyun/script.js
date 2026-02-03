@@ -5,34 +5,45 @@ const buttonsDiv = document.querySelector('.buttons');
 const result = document.getElementById('result');
 const container = document.getElementById('main-container');
 
-// Hayır butonunu kaçırma fonksiyonu
-hayirBtn.addEventListener('mouseover', () => {
-    const i = Math.floor(Math.random() * (window.innerWidth - hayirBtn.clientWidth));
-    const j = Math.floor(Math.random() * (window.innerHeight - hayirBtn.clientHeight));
+function moveButton() {
+    // Ekran sınırlarını al (butonun dışarı taşmaması için)
+    const maxX = window.innerWidth - hayirBtn.clientWidth - 20;
+    const maxY = window.innerHeight - hayirBtn.clientHeight - 20;
+
+    // Rastgele yeni pozisyon (en az 10px kenarlardan pay bırak)
+    const randomX = Math.max(10, Math.floor(Math.random() * maxX));
+    const randomY = Math.max(10, Math.floor(Math.random() * maxY));
 
     hayirBtn.style.position = 'fixed';
-    hayirBtn.style.left = i + 'px';
-    hayirBtn.style.top = j + 'px';
+    hayirBtn.style.left = randomX + 'px';
+    hayirBtn.style.top = randomY + 'px';
+}
+
+// Masaüstü için
+hayirBtn.addEventListener('mouseover', moveButton);
+
+// Mobil için (Dokunduğu anda kaçsın)
+hayirBtn.addEventListener('touchstart', (e) => {
+    e.preventDefault(); // Tıklama olayını engelle
+    moveButton();
 });
 
 // Evet butonuna tıklama
 evetBtn.addEventListener('click', () => {
+    document.querySelector('.emoji-header').style.display = 'none';
     question.classList.add('hidden');
     buttonsDiv.classList.add('hidden');
     result.classList.remove('hidden');
     hayirBtn.style.display = 'none';
 
-    // Havai fişekler (Confetti)
     fireworks();
-
-    // Balonlar
     createBalloons();
 });
 
 function fireworks() {
     const duration = 5 * 1000;
     const animationEnd = Date.now() + duration;
-    const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
+    const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 1000 };
 
     function randomInRange(min, max) {
         return Math.random() * (max - min) + min;
@@ -52,14 +63,13 @@ function fireworks() {
 }
 
 function createBalloons() {
-    const container = document.body;
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 25; i++) {
         const balloon = document.createElement('div');
         balloon.className = 'balloon';
         balloon.style.left = Math.random() * 100 + 'vw';
         balloon.style.backgroundColor = `hsl(${Math.random() * 360}, 70%, 70%)`;
         balloon.style.animationDelay = Math.random() * 2 + 's';
-        balloon.style.animationDuration = (Math.random() * 3 + 3) + 's';
-        container.appendChild(balloon);
+        balloon.style.animationDuration = (Math.random() * 3 + 4) + 's';
+        document.body.appendChild(balloon);
     }
 }

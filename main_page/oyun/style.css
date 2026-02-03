@@ -55,18 +55,25 @@ button {
 #evet-btn {
     background-color: #4caf50;
     color: white;
-    z-index: 2;
+    z-index: 1;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
 }
 
 #evet-btn:active {
-    transform: scale(0.9);
+    transform: translate(-50%, -50%) scale(0.9);
 }
 
 #hayir-btn {
     background-color: #f44336;
     color: white;
+    z-index: 2;
     position: absolute;
-    right: 0;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
 }
 
 .hidden {

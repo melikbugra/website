@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Gitar / Bağlama Akort Cihazı</title>
+    <style>
+        :root {
+            --bg: #050814;
+            --card: #10152a;
+            --accent: #4f8cff;
+            --accent-soft: rgba(79, 140, 255, 0.2);
+            --text: #e9f0ff;
+            --muted: #8f9ac2;
+            --good: #4fd180;
+            --bad: #ff5c7a;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: radial-gradient(circle at top, #17204b 0, var(--bg) 45%);
+            color: var(--text);
+        }
+
+        .tuner-wrapper {
+            width: 100%;
+            max-width: 480px;
+            padding: 16px;
+        }
+
+        .card {
+            background: linear-gradient(145deg, rgba(255, 255, 255, 0.03), rgba(0, 0, 0, 0.6));
+            border-radius: 20px;
+            padding: 20px 18px 18px;
+            box-shadow: 0 18px 45px rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            backdrop-filter: blur(18px);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            gap: 8px;
+        }
+
+        .title {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .subtitle {
+            font-size: 0.8rem;
+            color: var(--muted);
+        }
+
+        .status-pill {
+            font-size: 0.75rem;
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--muted);
+            background: rgba(3, 7, 18, 0.6);
+            white-space: nowrap;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #f97373;
+        }
+
+        .status-dot.on {
+            background: #4fd180;
+            box-shadow: 0 0 8px #4fd180;
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .btn-main {
+            flex: 1;
+            border: none;
+            border-radius: 999px;
+            padding: 10px 16px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            background: var(--accent);
+            color: #fff;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 10px 25px rgba(79, 140, 255, 0.45);
+            transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+        }
+
+        .btn-main:active {
+            transform: translateY(1px) scale(0.99);
+            box-shadow: 0 5px 16px rgba(79, 140, 255, 0.45);
+        }
+
+        .btn-main[disabled] {
+            opacity: 0.6;
+            cursor: default;
+            box-shadow: none;
+        }
+
+        .hint {
+            font-size: 0.7rem;
+            color: var(--muted);
+            text-align: right;
+        }
+
+        .selectors {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+
+        .select-group {
+            flex: 1 1 48%;
+            min-width: 0;
+        }
+
+        .select-group label {
+            display: block;
+            font-size: 0.7rem;
+            color: var(--muted);
+            margin-bottom: 3px;
+        }
+
+        .select-group select {
+            width: 100%;
+            padding: 6px 8px;
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 184, 0.5);
+            background: rgba(15, 23, 42, 0.95);
+            color: var(--text);
+            font-size: 0.8rem;
+            outline: none;
+        }
+
+        .select-group select:focus {
+            border-color: rgba(79, 140, 255, 0.9);
+            box-shadow: 0 0 0 1px rgba(79, 140, 255, 0.6);
+        }
+
+        .display {
+            margin-top: 4px;
+            border-radius: 16px;
+            padding: 14px 14px 12px;
+            background: radial-gradient(circle at top, rgba(79, 140, 255, 0.25), rgba(7, 11, 25, 0.9));
+            border: 1px solid rgba(165, 180, 252, 0.22);
+        }
+
+        .note-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            gap: 12px;
+        }
+
+        .note-main {
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+        }
+
+        .note-name {
+            font-size: 2.3rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+        }
+
+        .note-octave {
+            font-size: 1rem;
+            color: var(--muted);
+            margin-top: 6px;
+        }
+
+        .freq {
+            text-align: right;
+            font-feature-settings: "tnum" 1;
+        }
+
+        .freq-label {
+            font-size: 0.7rem;
+            color: var(--muted);
+        }
+
+        .freq-value {
+            font-size: 1.05rem;
+            font-weight: 600;
+            margin-top: 2px;
+        }
+
+        .detune-area {
+            margin-top: 8px;
+        }
+
+        .detune-label-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: var(--muted);
+            margin-bottom: 6px;
+        }
+
+        .detune-bar-shell {
+            position: relative;
+            height: 20px;
+            border-radius: 999px;
+            background: radial-gradient(circle at top, rgba(148, 163, 184, 0.3), rgba(15, 23, 42, 0.9));
+            overflow: hidden;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+        }
+
+        .detune-bar-center {
+            position: absolute;
+            left: 50%;
+            top: 0;
+            width: 1px;
+            height: 100%;
+            background: rgba(148, 163, 184, 0.75);
+        }
+
+        .detune-bar-active {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg, var(--bad), var(--good), var(--bad));
+            opacity: 0.09;
+        }
+
+        .detune-indicator {
+            position: absolute;
+            top: 1px;
+            width: 18px;
+            height: 18px;
+            border-radius: 999px;
+            border: 1px solid rgba(15, 23, 42, 0.9);
+            background: radial-gradient(circle at top, #e5e7eb, #9ca3af);
+            box-shadow: 0 0 0 3px rgba(79, 140, 255, 0.4);
+            transform: translateX(-50%);
+            transition: left 0.05s linear;
+        }
+
+        .detune-cents {
+            margin-top: 4px;
+            font-size: 0.78rem;
+            text-align: center;
+            color: var(--muted);
+        }
+
+        .detune-cents span {
+            font-weight: 600;
+            color: var(--text);
+            padding-inline: 3px;
+        }
+
+        .guitar-notes {
+            margin-top: 14px;
+            display: flex;
+            justify-content: space-between;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .string-chip {
+            flex: 1 1 28%;
+            min-width: 0;
+            padding: 4px 0;
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 184, 0.45);
+            font-size: 0.72rem;
+            text-align: center;
+            color: var(--muted);
+            background: rgba(15, 23, 42, 0.9);
+            transition: box-shadow 0.12s ease, border-color 0.12s ease, background 0.12s ease, transform 0.12s ease;
+        }
+
+        .string-chip span {
+            font-weight: 600;
+            color: var(--text);
+            margin-inline: 2px;
+        }
+
+        .string-chip.active {
+            border-color: rgba(79, 140, 255, 0.9);
+            background: radial-gradient(circle at top, rgba(79, 140, 255, 0.45), rgba(15, 23, 42, 1));
+            color: #e5e7eb;
+            box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.5);
+        }
+
+        .string-chip.active span {
+            color: #fff;
+        }
+
+        /* Tel akort olduğunda yeşil yanma efekti */
+        .string-chip.tuned {
+            border-color: rgba(74, 222, 128, 0.95);
+            background: radial-gradient(circle at top, rgba(34, 197, 94, 0.7), rgba(15, 23, 42, 1));
+            box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.85), 0 0 18px rgba(34, 197, 94, 0.7);
+            transform: translateY(-1px);
+            color: #ecfdf5;
+        }
+
+        .string-chip.tuned span {
+            color: #ecfdf5;
+        }
+
+        .footer {
+            margin-top: 12px;
+            font-size: 0.7rem;
+            color: var(--muted);
+            text-align: center;
+        }
+
+        .footer small {
+            opacity: 0.75;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                scroll-behavior: auto !important;
+                animation-duration: 0.001ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.001ms !important;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="tuner-wrapper">
+        <div class="card">
+            <div class="card-header">
+                <div>
+                    <div class="title">Akort Cihazı</div>
+                    <div class="subtitle">Mikrofona izin ver, enstrümanı ve akortu seç, sonra tele vur.</div>
+                </div>
+                <div class="status-pill" id="status-pill">
+                    <span class="status-dot" id="status-dot"></span>
+                    <span id="status-text">Beklemede</span>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button id="toggle-btn" class="btn-main">
+                    🔈 Başlat
+                </button>
+                <div class="hint">İpucu: Sessiz bir ortamda kullan.</div>
+            </div>
+
+            <div class="selectors">
+                <div class="select-group">
+                    <label for="instrument-select">Enstrüman</label>
+                    <select id="instrument-select">
+                        <option value="guitar">Gitar</option>
+                        <option value="baglama_long">Uzun sap bağlama</option>
+                    </select>
+                </div>
+                <div class="select-group">
+                    <label for="tuning-select">Akort türü</label>
+                    <select id="tuning-select">
+                        <!-- JS dolduracak -->
+                    </select>
+                </div>
+            </div>
+
+            <div class="display">
+                <div class="note-row">
+                    <div class="note-main">
+                        <div class="note-name" id="note-name">- -</div>
+                        <div class="note-octave" id="note-octave"></div>
+                    </div>
+                    <div class="freq">
+                        <div class="freq-label">Frekans</div>
+                        <div class="freq-value" id="freq-value">0.0 Hz</div>
+                    </div>
+                </div>
+
+                <div class="detune-area">
+                    <div class="detune-label-row">
+                        <span>Pes</span>
+                        <span>Akortlu</span>
+                        <span>İnce</span>
+                    </div>
+                    <div class="detune-bar-shell">
+                        <div class="detune-bar-active"></div>
+                        <div class="detune-bar-center"></div>
+                        <div class="detune-indicator" id="detune-indicator" style="left: 50%"></div>
+                    </div>
+                    <div class="detune-cents" id="detune-cents">Merkeğe getir &mdash; <span>0</span> cent</div>
+                </div>
+
+                <div class="guitar-notes" id="string-chips">
+                    <!-- JS ile doldurulacak -->
+                </div>
+            </div>
+
+            <div class="footer">
+                <small>Tarayıcı destekli basit tuner. Gitar ve uzun sap bağlama için farklı akort düzenleri
+                    seçilebilir.</small>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            const toggleBtn = document.getElementById("toggle-btn");
+            const statusDot = document.getElementById("status-dot");
+            const statusText = document.getElementById("status-text");
+            const statusPill = document.getElementById("status-pill");
+
+            const noteNameEl = document.getElementById("note-name");
+            const noteOctaveEl = document.getElementById("note-octave");
+            const freqValueEl = document.getElementById("freq-value");
+            const detuneIndicator = document.getElementById("detune-indicator");
+            const detuneCentsEl = document.getElementById("detune-cents");
+            const stringChipsContainer = document.getElementById("string-chips");
+
+            const instrumentSelect = document.getElementById("instrument-select");
+            const tuningSelect = document.getElementById("tuning-select");
+
+            let stringChips = [];
+
+            let audioContext = null;
+            let analyser = null;
+            let mediaStreamSource = null;
+            let rafId = null;
+            let isRunning = false;
+            let buf = new Float32Array(2048);
+
+            const SMOOTH_N = 8;
+            let freqHistory = [];
+            let displayedCents = 0;
+
+            const stableState = {
+                currentNoteKey: null,
+                framesInRange: 0,
+                tunedNoteKey: null,
+                timeoutId: null,
+            };
+
+            const A4 = 440;
+            const noteStrings = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+
+            // Enstrüman & akort konfigürasyonları
+            const INSTRUMENTS = {
+                guitar: {
+                    label: "Gitar",
+                    tunings: {
+                        standard: {
+                            label: "Standard (E A D G B E)",
+                            strings: [
+                                { noteKey: "E2", labelHtml: "6. tel <span>E2</span>" },
+                                { noteKey: "A2", labelHtml: "5. tel <span>A2</span>" },
+                                { noteKey: "D3", labelHtml: "4. tel <span>D3</span>" },
+                                { noteKey: "G3", labelHtml: "3. tel <span>G3</span>" },
+                                { noteKey: "B3", labelHtml: "2. tel <span>B3</span>" },
+                                { noteKey: "E4", labelHtml: "1. tel <span>E4</span>" },
+                            ],
+                        },
+                        drop_d: {
+                            label: "Drop D (D A D G B E)",
+                            strings: [
+                                { noteKey: "D2", labelHtml: "6. tel <span>D2</span>" },
+                                { noteKey: "A2", labelHtml: "5. tel <span>A2</span>" },
+                                { noteKey: "D3", labelHtml: "4. tel <span>D3</span>" },
+                                { noteKey: "G3", labelHtml: "3. tel <span>G3</span>" },
+                                { noteKey: "B3", labelHtml: "2. tel <span>B3</span>" },
+                                { noteKey: "E4", labelHtml: "1. tel <span>E4</span>" },
+                            ],
+                        },
+                        drop_c: {
+                            label: "Drop C (C G C F A D)",
+                            strings: [
+                                { noteKey: "C2", labelHtml: "6. tel <span>C2</span>" },
+                                { noteKey: "G2", labelHtml: "5. tel <span>G2</span>" },
+                                { noteKey: "C3", labelHtml: "4. tel <span>C3</span>" },
+                                { noteKey: "F3", labelHtml: "3. tel <span>F3</span>" },
+                                { noteKey: "A3", labelHtml: "2. tel <span>A3</span>" },
+                                { noteKey: "D4", labelHtml: "1. tel <span>D4</span>" },
+                            ],
+                        },
+                        half_step_down: {
+                            label: "Half step down (Eb Ab Db Gb Bb Eb)",
+                            strings: [
+                                { noteKey: "D#2", labelHtml: "6. tel <span>Eb/D#2</span>" },
+                                { noteKey: "G#2", labelHtml: "5. tel <span>Ab/G#2</span>" },
+                                { noteKey: "C#3", labelHtml: "4. tel <span>Db/C#3</span>" },
+                                { noteKey: "F#3", labelHtml: "3. tel <span>Gb/F#3</span>" },
+                                { noteKey: "A#3", labelHtml: "2. tel <span>Bb/A#3</span>" },
+                                { noteKey: "D#4", labelHtml: "1. tel <span>Eb/D#4</span>" },
+                            ],
+                        },
+                        full_step_down: {
+                            label: "Full step down (D G C F A D)",
+                            strings: [
+                                { noteKey: "D2", labelHtml: "6. tel <span>D2</span>" },
+                                { noteKey: "G2", labelHtml: "5. tel <span>G2</span>" },
+                                { noteKey: "C3", labelHtml: "4. tel <span>C3</span>" },
+                                { noteKey: "F3", labelHtml: "3. tel <span>F3</span>" },
+                                { noteKey: "A3", labelHtml: "2. tel <span>A3</span>" },
+                                { noteKey: "D4", labelHtml: "1. tel <span>D4</span>" },
+                            ],
+                        },
+                    },
+                },
+                baglama_long: {
+                    label: "Uzun sap bağlama",
+                    tunings: {
+                        bozuk_duzen: {
+                            label: "Bozuk düzen",
+                            // Ekran görüntüsündeki değerlere göre yaklaşık: Do, kalın Do, Fa, Si(bemol), kalın Si(bemol)
+                            strings: [
+                                { noteKey: "C4", labelHtml: "alt tel <span>Do (C4 ≈ 261.6 Hz)</span>" },
+                                { noteKey: "C3", labelHtml: "alt bam tel <span>kalın Do (C3 ≈ 130.8 Hz)</span>" },
+                                { noteKey: "F3", labelHtml: "orta tel <span>Fa (F3 ≈ 174.6 Hz)</span>" },
+                                { noteKey: "A#3", labelHtml: "üst tel <span>Si♭ (A#3 ≈ 233.1 Hz)</span>" },
+                                { noteKey: "A#2", labelHtml: "üst bam tel <span>kalın Si♭ (A#2 ≈ 116.5 Hz)</span>" },
+                            ],
+                        },
+                        baglama_duzeni: {
+                            label: "Bağlama düzeni",
+                            // Do, kalın Do, Fa, Sol, kalın Sol
+                            strings: [
+                                { noteKey: "C4", labelHtml: "alt tel <span>Do (C4 ≈ 261.6 Hz)</span>" },
+                                { noteKey: "C3", labelHtml: "alt bam tel <span>kalın Do (C3 ≈ 130.8 Hz)</span>" },
+                                { noteKey: "F3", labelHtml: "orta tel <span>Fa (F3 ≈ 174.6 Hz)</span>" },
+                                { noteKey: "G3", labelHtml: "üst tel <span>Sol (G3 ≈ 196 Hz)</span>" },
+                                { noteKey: "G2", labelHtml: "üst bam tel <span>kalın Sol (G2 ≈ 98 Hz)</span>" },
+                            ],
+                        },
+                    },
+                },
+            };
+
+            let currentInstrument = "guitar";
+            let currentTuningKey = "standard";
+
+            function noteFromPitch(freq) {
+                const noteNum = 12 * (Math.log(freq / A4) / Math.LN2);
+                return Math.round(noteNum) + 69;
+            }
+
+            function frequencyFromNoteNumber(note) {
+                return A4 * Math.pow(2, (note - 69) / 12);
+            }
+
+            function centsOffFromPitch(freq, note) {
+                return Math.floor(1200 * Math.log(freq / frequencyFromNoteNumber(note)) / Math.LN2);
+            }
+
+            function autoCorrelate(bufIn, sampleRate) {
+                let SIZE = bufIn.length;
+                let rms = 0;
+                for (let i = 0; i < SIZE; i++) {
+                    const val = bufIn[i];
+                    rms += val * val;
+                }
+                rms = Math.sqrt(rms / SIZE);
+                if (rms < 0.005) return -1;
+
+                let r1 = 0;
+                let r2 = SIZE - 1;
+                const thres = 0.2;
+                for (let i = 0; i < SIZE / 2; i++) {
+                    if (Math.abs(bufIn[i]) < thres) {
+                        r1 = i;
+                        break;
+                    }
+                }
+                for (let i = 1; i < SIZE / 2; i++) {
+                    if (Math.abs(bufIn[SIZE - i]) < thres) {
+                        r2 = SIZE - i;
+                        break;
+                    }
+                }
+
+                let buf = bufIn.slice(r1, r2);
+                SIZE = buf.length;
+                if (!SIZE) return -1;
+
+                const c = new Array(SIZE).fill(0);
+                for (let i = 0; i < SIZE; i++) {
+                    for (let j = 0; j < SIZE - i; j++) {
+                        c[i] += buf[j] * buf[j + i];
+                    }
+                }
+
+                let d = 0;
+                while (d < SIZE - 1 && c[d] > c[d + 1]) {
+                    d++;
+                }
+
+                let maxval = -1;
+                let maxpos = -1;
+                for (let i = d; i < SIZE; i++) {
+                    if (c[i] > maxval) {
+                        maxval = c[i];
+                        maxpos = i;
+                    }
+                }
+                let T0 = maxpos;
+                if (T0 <= 0) return -1;
+
+                const x1 = c[T0 - 1] || 0;
+                const x2 = c[T0] || 0;
+                const x3 = c[T0 + 1] || 0;
+                const a = (x1 + x3 - 2 * x2) / 2;
+                const b = (x3 - x1) / 2;
+                if (a) {
+                    T0 = T0 - b / (2 * a);
+                }
+
+                const freq = sampleRate / T0;
+                if (freq < 70 || freq > 1200) return -1;
+                return freq;
+            }
+
+            function updateStringHighlight(noteName, octave) {
+                const current = noteName + String(octave);
+                stringChips.forEach((chip) => {
+                    const target = chip.getAttribute("data-note");
+                    chip.classList.toggle("active", target === current);
+                });
+            }
+
+            function setTunedString(noteKey) {
+                stringChips.forEach((chip) => chip.classList.remove("tuned"));
+                const targetChip = stringChips.find(
+                    (chip) => chip.getAttribute("data-note") === noteKey
+                );
+                if (!targetChip) return;
+                targetChip.classList.add("tuned");
+
+                if (stableState.timeoutId) {
+                    clearTimeout(stableState.timeoutId);
+                }
+                stableState.timeoutId = setTimeout(() => {
+                    targetChip.classList.remove("tuned");
+                    stableState.tunedNoteKey = null;
+                }, 1500);
+            }
+
+            function smoothFrequency(newFreq) {
+                if (newFreq <= 0) {
+                    freqHistory = [];
+                    return -1;
+                }
+                freqHistory.push(newFreq);
+                if (freqHistory.length > SMOOTH_N) {
+                    freqHistory.shift();
+                }
+                const sum = freqHistory.reduce((a, b) => a + b, 0);
+                return sum / freqHistory.length;
+            }
+
+            function resetDisplay() {
+                noteNameEl.textContent = "- -";
+                noteOctaveEl.textContent = "";
+                freqValueEl.textContent = "0.0 Hz";
+                detuneIndicator.style.left = "50%";
+                detuneCentsEl.innerHTML = "Sinyal algılanmadı &mdash; <span>0</span> cent";
+                displayedCents = 0;
+                updateStringHighlight("", "");
+            }
+
+            function updateUI(freqRaw) {
+                if (freqRaw === -1) {
+                    resetDisplay();
+                    stableState.currentNoteKey = null;
+                    stableState.framesInRange = 0;
+                    return;
+                }
+
+                const freq = smoothFrequency(freqRaw);
+                if (freq === -1) {
+                    resetDisplay();
+                    stableState.currentNoteKey = null;
+                    stableState.framesInRange = 0;
+                    return;
+                }
+
+                const note = noteFromPitch(freq);
+                const noteName = noteStrings[note % 12];
+                const octave = Math.floor(note / 12) - 1;
+                let cents = centsOffFromPitch(freq, note);
+
+                if (Math.abs(cents) < 2) cents = 0;
+
+                displayedCents += (cents - displayedCents) * 0.2;
+
+                noteNameEl.textContent = noteName;
+                noteOctaveEl.textContent = octave;
+                freqValueEl.textContent = freq.toFixed(1) + " Hz";
+
+                const clamped = Math.max(-50, Math.min(50, displayedCents));
+                const percent = (clamped + 50) / 100;
+                const left = 8 + percent * (100 - 16);
+                detuneIndicator.style.left = left + "%";
+                detuneCentsEl.innerHTML = `Sapma: <span>${Math.round(displayedCents)}</span> cent`;
+
+                updateStringHighlight(noteName, octave);
+
+                const noteKey = noteName + String(octave);
+                const absDisplayed = Math.abs(displayedCents);
+
+                const STABLE_CENT_THRESHOLD = 5;
+                const STABLE_FRAMES_REQUIRED = 25;
+
+                if (absDisplayed <= STABLE_CENT_THRESHOLD) {
+                    if (stableState.currentNoteKey === noteKey) {
+                        stableState.framesInRange += 1;
+                    } else {
+                        stableState.currentNoteKey = noteKey;
+                        stableState.framesInRange = 1;
+                    }
+                } else {
+                    if (stableState.currentNoteKey === noteKey) {
+                        stableState.framesInRange = 0;
+                    }
+                }
+
+                if (
+                    stableState.currentNoteKey === noteKey &&
+                    stableState.framesInRange >= STABLE_FRAMES_REQUIRED &&
+                    stableState.tunedNoteKey !== noteKey
+                ) {
+                    stableState.tunedNoteKey = noteKey;
+                    setTunedString(noteKey);
+                }
+            }
+
+            function updatePitch() {
+                if (!isRunning || !analyser) return;
+                analyser.getFloatTimeDomainData(buf);
+                const freq = autoCorrelate(buf, audioContext.sampleRate);
+                updateUI(freq);
+                rafId = window.requestAnimationFrame(updatePitch);
+            }
+
+            async function startTuner() {
+                if (isRunning) {
+                    stopTuner();
+                    return;
+                }
+
+                try {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (!AudioCtx) {
+                        throw new Error("AudioContext desteklenmiyor");
+                    }
+
+                    if (!audioContext) {
+                        audioContext = new AudioCtx();
+                    }
+                    if (audioContext.state === "suspended") {
+                        await audioContext.resume();
+                    }
+
+                    const getUserMedia =
+                        navigator.mediaDevices && navigator.mediaDevices.getUserMedia
+                            ? navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices)
+                            : (constraints) =>
+                                new Promise((resolve, reject) => {
+                                    const legacyGetUserMedia =
+                                        navigator.getUserMedia ||
+                                        navigator.webkitGetUserMedia ||
+                                        navigator.mozGetUserMedia ||
+                                        navigator.msGetUserMedia;
+                                    if (!legacyGetUserMedia) {
+                                        reject(new Error("getUserMedia desteklenmiyor"));
+                                        return;
+                                    }
+                                    legacyGetUserMedia.call(navigator, constraints, resolve, reject);
+                                });
+
+                    const constraints = {
+                        audio: {
+                            echoCancellation: true,
+                            noiseSuppression: true,
+                            autoGainControl: true,
+                            channelCount: 1,
+                        },
+                        video: false,
+                    };
+
+                    const stream = await getUserMedia(constraints);
+
+                    analyser = audioContext.createAnalyser();
+                    analyser.fftSize = 2048;
+
+                    mediaStreamSource = audioContext.createMediaStreamSource(stream);
+                    mediaStreamSource.connect(analyser);
+
+                    isRunning = true;
+                    statusDot.classList.add("on");
+                    statusText.textContent = "Dinleniyor";
+                    statusPill.style.borderColor = "rgba(74, 222, 128, 0.7)";
+                    toggleBtn.textContent = "🔈 Durdur";
+                    toggleBtn.setAttribute("aria-pressed", "true");
+
+                    freqHistory = [];
+                    displayedCents = 0;
+                    stableState.currentNoteKey = null;
+                    stableState.framesInRange = 0;
+
+                    updatePitch();
+                } catch (err) {
+                    console.error(err);
+                    statusDot.classList.remove("on");
+                    const isIosSafari =
+                        /iP(hone|od|ad)/.test(navigator.platform || "") ||
+                        (navigator.userAgent && /iPhone|iPad|iPod/.test(navigator.userAgent));
+
+                    if (isIosSafari) {
+                        statusText.textContent =
+                            "iPhone/iPad: Safari'de mikrofon izni verdiğinden ve HTTPS kullandığından emin ol";
+                    } else {
+                        statusText.textContent = "Hata: Mikrofon izni gerekiyor";
+                    }
+                    statusPill.style.borderColor = "rgba(248, 113, 113, 0.8)";
+                    toggleBtn.textContent = "🔈 Tekrar dene";
+                }
+            }
+
+            function stopTuner() {
+                isRunning = false;
+                if (rafId) window.cancelAnimationFrame(rafId);
+                rafId = null;
+                resetDisplay();
+
+                if (mediaStreamSource && mediaStreamSource.mediaStream) {
+                    mediaStreamSource.mediaStream.getTracks().forEach((t) => t.stop());
+                }
+                mediaStreamSource = null;
+                analyser = null;
+
+                statusDot.classList.remove("on");
+                statusText.textContent = "Beklemede";
+                statusPill.style.borderColor = "rgba(255, 255, 255, 0.12)";
+                toggleBtn.textContent = "🔈 Başlat";
+                toggleBtn.setAttribute("aria-pressed", "false");
+            }
+
+            toggleBtn.addEventListener("click", function () {
+                if (!isRunning) {
+                    startTuner();
+                } else {
+                    stopTuner();
+                }
+            });
+
+            function renderStringChips() {
+                const instrumentCfg = INSTRUMENTS[currentInstrument];
+                const tuningCfg = instrumentCfg.tunings[currentTuningKey];
+
+                stringChipsContainer.innerHTML = "";
+                tuningCfg.strings.forEach((s) => {
+                    const div = document.createElement("div");
+                    div.className = "string-chip";
+                    div.setAttribute("data-note", s.noteKey);
+                    div.innerHTML = s.labelHtml;
+                    stringChipsContainer.appendChild(div);
+                });
+
+                stringChips = Array.from(stringChipsContainer.querySelectorAll(".string-chip"));
+                // tuned / active durumlarını sıfırla
+                stringChips.forEach((chip) => {
+                    chip.classList.remove("active");
+                    chip.classList.remove("tuned");
+                });
+            }
+
+            function populateTuningOptions() {
+                const instrumentCfg = INSTRUMENTS[currentInstrument];
+                const tunings = instrumentCfg.tunings;
+
+                tuningSelect.innerHTML = "";
+                Object.entries(tunings).forEach(([key, cfg]) => {
+                    const opt = document.createElement("option");
+                    opt.value = key;
+                    opt.textContent = cfg.label;
+                    tuningSelect.appendChild(opt);
+                });
+
+                if (!tunings[currentTuningKey]) {
+                    currentTuningKey = Object.keys(tunings)[0];
+                }
+                tuningSelect.value = currentTuningKey;
+            }
+
+            instrumentSelect.addEventListener("change", () => {
+                currentInstrument = instrumentSelect.value;
+                populateTuningOptions();
+                renderStringChips();
+            });
+
+            tuningSelect.addEventListener("change", () => {
+                currentTuningKey = tuningSelect.value;
+                renderStringChips();
+            });
+
+            // Başlangıç: gitar + standard
+            populateTuningOptions();
+            renderStringChips();
+
+            window.addEventListener(
+                "touchstart",
+                function () {
+                    if (!audioContext) return;
+                    if (audioContext.state === "suspended") {
+                        audioContext.resume();
+                    }
+                },
+                { passive: true }
+            );
+        })();
+    </script>
+</body>
+
+</html>

@@ -6,6 +6,7 @@ services:
     volumes:
       - ./mlruns:/usr/src/app/mlruns
       # - ./mlflow.db:/usr/src/app/mlflow.db
+    restart: unless-stopped
     networks:
       - web
 
@@ -24,6 +25,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
     networks:
       - web
 
@@ -36,6 +38,7 @@ services:
     #   - "5050:80"
     depends_on:
       - optuna-db
+    restart: unless-stopped
     networks:
       - web
 

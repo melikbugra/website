@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  greenhouse:
+    build: .
+    image: greenhouse:latest
+    container_name: greenhouse
+    restart: unless-stopped
+    networks:
+      - web
+
+networks:
+  web:
+    external: true
+    name: nginxproxymanager_default

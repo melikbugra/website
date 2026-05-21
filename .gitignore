@@ -12,3 +12,4 @@ teamspeak/data-ts6
 **/*.gif
 **/*.png
 **logs.txt
+csfloat_bot/bot.log

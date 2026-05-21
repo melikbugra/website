@@ -1,0 +1,18 @@
+[project]
+name = "csfloat-bot"
+version = "0.1.0"
+description = "Async CSFloat trading bot"
+authors = [
+    {name = "melikbugra",email = "melikbugraozcelik@gmail.com"}
+]
+requires-python = ">=3.13"
+package-mode = false
+dependencies = [
+    "aiohttp>=3.10.0",
+    "python-dotenv>=1.0.0",
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

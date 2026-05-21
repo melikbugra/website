@@ -1,0 +1,7 @@
+services:
+  csfloat-bot:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./bot.log:/app/bot.log

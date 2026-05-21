@@ -350,7 +350,13 @@ class ExecutionModule:
         self._last_balance_refresh: float = 0.0
 
     async def refresh_balance(self) -> bool:
-        headers: dict[str, str] = {"Cookie": self.config.cookies, "Accept": "application/json"}
+        headers: dict[str, str] = {
+            "Cookie": self.config.cookies,
+            "Accept": "application/json",
+            "Accept-Language": "en-US,en;q=0.9",
+            "User-Agent": self._UA,
+            "Referer": "https://csfloat.com/",
+        }
         auth = self.config.auth_header_value()
         if auth:
             headers["Authorization"] = auth
@@ -379,11 +385,21 @@ class ExecutionModule:
             logger.warning("Balance fetch error: %s", exc)
             return False
 
+    _UA = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    )
+
     def _build_headers(self) -> dict[str, str]:
         headers: dict[str, str] = {
             "Cookie": self.config.cookies,
             "Content-Type": "application/json",
             "Accept": "application/json",
+            "Accept-Language": "en-US,en;q=0.9",
+            "User-Agent": self._UA,
+            "Referer": "https://csfloat.com/",
+            "Origin": "https://csfloat.com",
         }
         auth = self.config.auth_header_value()
         if auth:
@@ -530,6 +546,14 @@ class MarketPoller:
         headers: dict[str, str] = {
             "Cookie": self.config.cookies,
             "Accept": "application/json",
+            "Accept-Language": "en-US,en;q=0.9",
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/124.0.0.0 Safari/537.36"
+            ),
+            "Referer": "https://csfloat.com/",
+            "Origin": "https://csfloat.com",
         }
         auth = self.config.auth_header_value()
         if auth:

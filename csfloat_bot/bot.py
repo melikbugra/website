@@ -111,7 +111,7 @@ class BotConfig:
     max_item_price: int
 
     # ── Polling settings ──────────────────────────────────────────────────────
-    poll_interval: float = 8.0
+    poll_interval: float = 15.0
     poll_pages: int = 3        # cursor-pages per cycle; 3 × 50 = 150 listings
     listings_url: str = (
         "https://csfloat.com/api/v1/listings?sort_by=most_recent&limit=50"
@@ -503,6 +503,7 @@ class MarketPoller:
         self._seen_ids: set[str] = set()
         self._seen_queue: deque[str] = deque(maxlen=config.max_seen_ids)
         self._initialized = False
+        self._consecutive_429s: int = 0
 
     async def run(self) -> None:
         logger.info(
@@ -545,8 +546,17 @@ class MarketPoller:
 
             async with self.session.get(url, headers=headers) as resp:
                 if resp.status == 429:
-                    logger.warning("Poll rate limited (429) — waiting %.0fs", self.config.rate_limit_pause)
-                    await asyncio.sleep(self.config.rate_limit_pause)
+                    self._consecutive_429s += 1
+                    pause = min(60 * (2 ** (self._consecutive_429s - 1)), 600)
+                    logger.warning(
+                        "Poll rate limited (429) — waiting %.0fs (art arda %d)",
+                        pause, self._consecutive_429s,
+                    )
+                    await self._notifier.send_error(
+                        f"⏳ Rate limit (429) — {pause:.0f}s bekleniyor "
+                        f"(art arda {self._consecutive_429s}. kez)"
+                    ) if self._consecutive_429s == 1 else None
+                    await asyncio.sleep(pause)
                     return
                 if resp.status in (401, 403):
                     logger.critical("Poll AUTH FAILURE (HTTP %d) — update .env and restart", resp.status)
@@ -586,6 +596,8 @@ class MarketPoller:
             if not next_cursor or (not found_new and page_num > 0):
                 break
             cursor = next_cursor
+
+        self._consecutive_429s = 0
 
         if not self._initialized:
             self._initialized = True

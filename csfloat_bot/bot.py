@@ -111,7 +111,7 @@ class BotConfig:
     max_item_price: int
 
     # ── Polling settings ──────────────────────────────────────────────────────
-    poll_interval: float = 2.0
+    poll_interval: float = 8.0
     poll_pages: int = 3        # cursor-pages per cycle; 3 × 50 = 150 listings
     listings_url: str = (
         "https://csfloat.com/api/v1/listings?sort_by=most_recent&limit=50"

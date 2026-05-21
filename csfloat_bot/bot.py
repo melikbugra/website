@@ -30,8 +30,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import random
 import signal
 import sys
+import time
 from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
@@ -114,7 +116,7 @@ class BotConfig:
 
     # ── Polling settings ──────────────────────────────────────────────────────
     poll_interval: float = 15.0
-    poll_pages: int = 3        # cursor-pages per cycle; 3 × 50 = 150 listings
+    poll_pages: int = 1        # page 1 always has the newest listings
     listings_url: str = (
         "https://csfloat.com/api/v1/listings?sort_by=most_recent&limit=50"
     )
@@ -578,10 +580,11 @@ class MarketPoller:
                         "Poll rate limited (429) — waiting %.0fs (art arda %d)",
                         pause, self._consecutive_429s,
                     )
-                    await self._notifier.send_error(
-                        f"⏳ Rate limit (429) — {pause:.0f}s bekleniyor "
-                        f"(art arda {self._consecutive_429s}. kez)"
-                    ) if self._consecutive_429s == 1 else None
+                    if self._consecutive_429s == 1:
+                        await self._notifier.send_error(
+                            f"⏳ Rate limit (429) — {pause:.0f}s bekleniyor "
+                            f"(art arda {self._consecutive_429s}. kez)"
+                        )
                     await asyncio.sleep(pause)
                     return
                 if resp.status in (401, 403):
@@ -593,6 +596,28 @@ class MarketPoller:
                     return
                 resp.raise_for_status()
                 payload = await resp.json()
+                rl_remaining = resp.headers.get("X-RateLimit-Remaining")
+                rl_reset = resp.headers.get("X-RateLimit-Reset")
+
+            # Jitter after every request to mimic human timing
+            await asyncio.sleep(random.uniform(0.8, 1.8))
+
+            # Adaptive throttle: spread remaining quota evenly across the reset window
+            if rl_remaining is not None and rl_reset is not None:
+                try:
+                    remaining = int(rl_remaining)
+                    reset_in = max(1.0, float(rl_reset) - time.time())
+                    if remaining > 0:
+                        ideal_interval = reset_in / remaining
+                        extra = ideal_interval - self.config.poll_interval
+                        if extra > 0:
+                            logger.info(
+                                "Adaptive throttle: %d req left, reset in %.0fs → poll interval %.0fs",
+                                remaining, reset_in, ideal_interval,
+                            )
+                            await asyncio.sleep(extra)
+                except (ValueError, TypeError):
+                    pass
 
             # Handle both bare-list and {"data": [...], "cursor": "..."} shapes
             if isinstance(payload, list):

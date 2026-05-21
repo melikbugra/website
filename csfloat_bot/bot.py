@@ -185,23 +185,9 @@ class TelegramNotifier:
         self._session = session
         self._enabled = bool(token and chat_id)
 
-    async def send_buy(self, listing: dict, balance_left: int) -> None:
+    async def _post(self, text: str) -> None:
         if not self._enabled:
             return
-        name       = listing["item_name"]
-        price      = listing["price"]
-        fair       = listing.get("fair_value") or 0
-        float_val  = listing.get("float_value")
-        discount   = (1 - price / fair) * 100 if fair else 0.0
-        float_str  = f"{float_val:.6f}" if float_val is not None else "n/a"
-
-        text = (
-            f"🛒 <b>SATIN ALINDI</b>\n\n"
-            f"📦 {name}\n"
-            f"💰 Fiyat: <b>${price/100:.2f}</b>  |  Fair: ${fair/100:.2f}  |  <b>-{discount:.1f}%</b>\n"
-            f"🔬 Float: {float_str}\n"
-            f"💼 Kalan bakiye: <b>${balance_left/100:.2f}</b>"
-        )
         url = self._API.format(token=self._token)
         try:
             async with self._session.post(
@@ -213,6 +199,36 @@ class TelegramNotifier:
                     logger.warning("Telegram notification failed (HTTP %d): %s", resp.status, body[:200])
         except Exception as exc:
             logger.warning("Telegram send error: %s", exc)
+
+    async def send_startup(self, config: "BotConfig", balance: int) -> None:
+        text = (
+            f"🤖 <b>CSFloat Bot Başladı</b>\n\n"
+            f"⚙️ Margin: <b>{config.min_profit_margin*100:.0f}%</b>  |  "
+            f"Vol≥{config.min_volume}  |  Fair≥{config.min_fair_value}¢\n"
+            f"💰 Bakiye: <b>${balance/100:.2f}</b>\n"
+            f"📡 Poll: {config.poll_interval}s  |  {config.poll_pages} sayfa"
+        )
+        await self._post(text)
+
+    async def send_buy(self, listing: dict, balance_left: int) -> None:
+        name      = listing["item_name"]
+        price     = listing["price"]
+        fair      = listing.get("fair_value") or 0
+        float_val = listing.get("float_value")
+        discount  = (1 - price / fair) * 100 if fair else 0.0
+        float_str = f"{float_val:.6f}" if float_val is not None else "n/a"
+        text = (
+            f"🛒 <b>SATIN ALINDI</b>\n\n"
+            f"📦 {name}\n"
+            f"💰 Fiyat: <b>${price/100:.2f}</b>  |  Fair: ${fair/100:.2f}  |  <b>-{discount:.1f}%</b>\n"
+            f"🔬 Float: {float_str}\n"
+            f"💼 Kalan bakiye: <b>${balance_left/100:.2f}</b>"
+        )
+        await self._post(text)
+
+    async def send_error(self, message: str) -> None:
+        text = f"🚨 <b>BOT HATASI</b>\n\n{message}"
+        await self._post(text)
 
 
 # ── Decision Engine ───────────────────────────────────────────────────────────
@@ -448,6 +464,10 @@ class ExecutionModule:
                 "AUTH FAILURE (HTTP %d) — credentials expired. Update .env and restart. body=%s",
                 status, body[:300],
             )
+            await self._notifier.send_error(
+                f"🔐 Satın alma auth hatası (HTTP {status})\n"
+                ".env dosyasını güncelle ve botu yeniden başlat."
+            )
             return False
 
         logger.warning("Unexpected HTTP %d for listing_id=%s. body=%s", status, listing_id, body[:300])
@@ -473,10 +493,12 @@ class MarketPoller:
         config: BotConfig,
         session: aiohttp.ClientSession,
         on_listing: Callable[[dict], Awaitable[None]],
+        notifier: TelegramNotifier,
     ) -> None:
         self.config = config
         self.session = session
         self.on_listing = on_listing
+        self._notifier = notifier
         self._running = True
         self._seen_ids: set[str] = set()
         self._seen_queue: deque[str] = deque(maxlen=config.max_seen_ids)
@@ -528,6 +550,10 @@ class MarketPoller:
                     return
                 if resp.status in (401, 403):
                     logger.critical("Poll AUTH FAILURE (HTTP %d) — update .env and restart", resp.status)
+                    await self._notifier.send_error(
+                        f"🔐 Auth başarısız (HTTP {resp.status})\n"
+                        ".env dosyasını güncelle ve botu yeniden başlat."
+                    )
                     return
                 resp.raise_for_status()
                 payload = await resp.json()
@@ -599,9 +625,14 @@ class TradingBot:
                 session,
             )
             self._executor = ExecutionModule(self.config, session, notifier)
-            await self._executor.refresh_balance()   # fetch balance before first buy
-            self._poller = MarketPoller(self.config, session, self._on_listing)
-            await self._poller.run()
+            await self._executor.refresh_balance()
+            await notifier.send_startup(self.config, self._executor._balance)
+            self._poller = MarketPoller(self.config, session, self._on_listing, notifier)
+            try:
+                await self._poller.run()
+            except Exception as exc:
+                await notifier.send_error(f"Beklenmeyen hata, bot durdu:\n<code>{exc}</code>")
+                raise
 
     async def _on_listing(self, raw: dict) -> None:
         listing = self.engine.extract_listing_data(raw)

@@ -9,6 +9,13 @@ services:
     restart: unless-stopped
     networks:
       - web
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mlflow.rule=Host(`mlflow.melikbugraozcelik.com`)"
+      - "traefik.http.routers.mlflow.entrypoints=websecure"
+      - "traefik.http.routers.mlflow.tls.certresolver=le"
+      - "traefik.http.routers.mlflow.middlewares=office-ip@file,hsts@file"
+      - "traefik.http.services.mlflow.loadbalancer.server.port=5000"
 
   optuna-db:
     image: postgres:16
@@ -41,8 +48,15 @@ services:
     restart: unless-stopped
     networks:
       - web
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.optuna.rule=Host(`optuna-pgadmin.melikbugraozcelik.com`)"
+      - "traefik.http.routers.optuna.entrypoints=websecure"
+      - "traefik.http.routers.optuna.tls.certresolver=le"
+      - "traefik.http.routers.optuna.middlewares=office-ip@file,hsts@file"
+      - "traefik.http.services.optuna.loadbalancer.server.port=80"
 
 networks:
   web:
     external: true
-    name: nginxproxymanager_default
+    name: traefik-proxy

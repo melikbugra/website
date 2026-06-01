@@ -1,22 +1,27 @@
+import LiveControl from './LiveControl'
+
 const TOGGLES = [
   { key: 'frame',       label: 'Ahşap İskelet',        icon: '▦' },
   { key: 'panels',      label: 'Polikarbonat Panel',   icon: '◻' },
   { key: 'door',        label: 'Çift Kapı',            icon: '🚪' },
   { key: 'fans',        label: 'Fanlar (3×120mm)',      icon: '⊙' },
-  { key: 'electronics', label: 'Elektronik (RPi...)',   icon: '⎇' },
+  { key: 'electronics', label: 'Elektronik (ESP32)',    icon: '⎇' },
   { key: 'irrigation',  label: 'Sulama Sistemi',        icon: '💧' },
   { key: 'plants',      label: 'Bitkiler & Saksılar',  icon: '🌿' },
-  { key: 'screws',      label: 'Vidalar & Civatalar',  icon: '⚙' },
 ]
 
 export default function ControlPanel({
   vis, onToggle,
   doorOpen, onDoorToggle,
+  live,
 }) {
   return (
     <aside style={styles.panel}>
-      <div style={styles.title}>Sera 3D Planlayıcı</div>
+      <div style={styles.title}>Akıllı Sera</div>
       <div style={styles.subtitle}>120 × 80 × 100 cm</div>
+
+      {/* Canlı kontrol (backend bağlıysa) */}
+      {live && <LiveControl live={live} />}
 
       {/* Bileşen toggle'ları */}
       <section style={styles.section}>
@@ -34,23 +39,6 @@ export default function ControlPanel({
             </span>
           </label>
         ))}
-      </section>
-
-      {/* Bağlantı bilgisi */}
-      <section style={styles.section}>
-        <div style={styles.sectionTitle}>BAĞLANTI</div>
-        <div style={{
-          ...styles.radioCard,
-          borderColor: '#4caf50',
-          background: '#1a2a1a',
-        }}>
-          <div style={{ color: '#e0e0e0', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
-            L-Köşe Braketi + Ahşap Vida
-          </div>
-          <div style={styles.radioDesc}>
-            50×50mm metal L-braketi, 4×40mm çinko kaplama Phillips vida. Her köşede 2 braketi.
-          </div>
-        </div>
       </section>
 
       {/* Kapı kontrolü */}
@@ -141,53 +129,6 @@ const styles = {
     color: '#fff',
     flexShrink: 0,
     transition: 'all 0.15s',
-  },
-  radioCard: {
-    display: 'block',
-    border: '1px solid',
-    borderRadius: 8,
-    padding: '8px 10px',
-    marginBottom: 8,
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-  },
-  radioRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-  },
-  radio: {
-    width: 14,
-    height: 14,
-    borderRadius: '50%',
-    border: '2px solid',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  radioDot: {
-    width: 6,
-    height: 6,
-    borderRadius: '50%',
-    background: '#4caf50',
-  },
-  badge: {
-    fontSize: 9,
-    background: '#1a3a1a',
-    color: '#4caf50',
-    border: '1px solid #2a5a2a',
-    borderRadius: 4,
-    padding: '1px 5px',
-    marginLeft: 'auto',
-    fontWeight: 700,
-    letterSpacing: '0.05em',
-  },
-  radioDesc: {
-    color: '#556677',
-    fontSize: 11,
-    lineHeight: 1.4,
   },
   doorBtn: {
     width: '100%',

@@ -24,8 +24,8 @@ services:
 
       KEYCLOAK_ENABLE_HTTPS: false
       KEYCLOAK_HOSTNAME: auth.melikbugraozcelik.com
-      KEYCLOAK_HOSTNAME_PORT: "8080"
-      # KEYCLOAK_PROXY_HEADERS: xforwarded
+      # TLS sonlandırma Traefik'te (edge); harici port 443 olduğu için
+      # KEYCLOAK_HOSTNAME_PORT belirtilmez.
       KEYCLOAK_ENABLE_HTTP_PORT: yes
       KEYCLOAK_HTTP_PORT: "8080"
       # KC_PROXY: edge
@@ -38,6 +38,13 @@ services:
     restart: unless-stopped
     networks:
       - web
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.keycloak.rule=Host(`auth.melikbugraozcelik.com`)"
+      - "traefik.http.routers.keycloak.entrypoints=websecure"
+      - "traefik.http.routers.keycloak.tls.certresolver=le"
+      - "traefik.http.routers.keycloak.middlewares=hsts@file"
+      - "traefik.http.services.keycloak.loadbalancer.server.port=8080"
 
 volumes:
   keycloak_data:
@@ -47,4 +54,4 @@ volumes:
 networks:
   web:
     external: true
-    name: nginxproxymanager_default
+    name: traefik-proxy

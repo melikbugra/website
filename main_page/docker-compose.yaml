@@ -10,8 +10,15 @@ services:
       - .:/usr/share/nginx/html
     networks:
       - web
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mainpage.rule=Host(`melikbugraozcelik.com`)"
+      - "traefik.http.routers.mainpage.entrypoints=websecure"
+      - "traefik.http.routers.mainpage.tls.certresolver=le"
+      - "traefik.http.routers.mainpage.middlewares=hsts@file"
+      - "traefik.http.services.mainpage.loadbalancer.server.port=80"
 
 networks:
   web:
     external: true
-    name: nginxproxymanager_default
+    name: traefik-proxy

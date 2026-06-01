@@ -1,0 +1,67 @@
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    ports:
+      - "1883:1883"      # MQTT (ESP32 buraya bağlanır)
+      - "9001:9001"      # MQTT over WebSocket (opsiyonel)
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    networks: [greenhouse]
+
+  influxdb:
+    image: influxdb:2.7
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUX_USER:-admin}
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUX_PASSWORD:-changeme123}
+      DOCKER_INFLUXDB_INIT_ORG: ${INFLUX_ORG:-greenhouse}
+      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUX_BUCKET:-greenhouse}
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUX_TOKEN:-dev-token-change-me}
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+    networks: [greenhouse]
+
+  backend:
+    build: .
+    restart: unless-stopped
+    depends_on: [mosquitto, influxdb]
+    ports:
+      - "8000:8000"
+    environment:
+      MQTT_HOST: mosquitto
+      MQTT_PORT: 1883
+      INFLUX_URL: http://influxdb:8086
+      INFLUX_TOKEN: ${INFLUX_TOKEN:-dev-token-change-me}
+      INFLUX_ORG: ${INFLUX_ORG:-greenhouse}
+      INFLUX_BUCKET: ${INFLUX_BUCKET:-greenhouse}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+    networks: [greenhouse]
+
+  # Opsiyonel: zaman serisi keşfi / RL veri inceleme için Grafana
+  grafana:
+    image: grafana/grafana:11.4.0
+    restart: unless-stopped
+    profiles: ["grafana"]
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks: [greenhouse]
+
+volumes:
+  mosquitto_data:
+  mosquitto_log:
+  influxdb_data:
+  grafana_data:
+
+networks:
+  greenhouse:
+    driver: bridge

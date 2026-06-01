@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import GreenhouseScene from './components/scene/GreenhouseScene'
 import ControlPanel from './components/ui/ControlPanel'
-import ConstructionGuide from './components/ui/ConstructionGuide'
+import LiveHud from './components/ui/LiveHud'
+import { useLiveData } from './hooks/useLiveData'
 import './App.css'
 
 export default function App() {
-  const [mode, setMode] = useState('guide') // 'guide' | '3d'
   const [vis, setVis] = useState({
     frame: true,
     panels: true,
@@ -14,9 +14,10 @@ export default function App() {
     electronics: true,
     irrigation: true,
     plants: true,
-    screws: true,
   })
   const [doorOpen, setDoorOpen] = useState(false)
+
+  const live = useLiveData()
 
   function toggle(key) {
     setVis(v => ({ ...v, [key]: !v[key] }))
@@ -24,42 +25,24 @@ export default function App() {
 
   return (
     <div className="app">
-      <div className="tab-bar">
-        <button
-          className={`tab ${mode === 'guide' ? 'active' : ''}`}
-          onClick={() => setMode('guide')}
-        >
-          Yapım Kılavuzu
-        </button>
-        <button
-          className={`tab ${mode === '3d' ? 'active' : ''}`}
-          onClick={() => setMode('3d')}
-        >
-          3D Görünüm
-        </button>
-      </div>
-
-      {mode === 'guide' ? (
-        <div className="guide-wrapper">
-          <ConstructionGuide />
-        </div>
-      ) : (
-        <div className="scene-layout">
-          <ControlPanel
+      <div className="scene-layout">
+        <ControlPanel
+          vis={vis}
+          onToggle={toggle}
+          doorOpen={doorOpen}
+          onDoorToggle={() => setDoorOpen(v => !v)}
+          live={live}
+        />
+        <div className="canvas-wrapper">
+          <LiveHud live={live} />
+          <GreenhouseScene
             vis={vis}
-            onToggle={toggle}
             doorOpen={doorOpen}
             onDoorToggle={() => setDoorOpen(v => !v)}
+            fanPwm={live.command?.fan_pwm ?? null}
           />
-          <div className="canvas-wrapper">
-            <GreenhouseScene
-              vis={vis}
-              doorOpen={doorOpen}
-              onDoorToggle={() => setDoorOpen(v => !v)}
-            />
-          </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }

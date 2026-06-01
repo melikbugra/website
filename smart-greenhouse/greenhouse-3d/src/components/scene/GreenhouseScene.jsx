@@ -8,7 +8,7 @@ import Electronics from './Electronics'
 import IrrigationSystem from './IrrigationSystem'
 import Plants from './Plants'
 
-export default function GreenhouseScene({ vis, doorOpen, onDoorToggle }) {
+export default function GreenhouseScene({ vis, doorOpen, onDoorToggle, fanPwm = null }) {
   return (
     <Canvas
       shadows
@@ -53,13 +53,13 @@ export default function GreenhouseScene({ vis, doorOpen, onDoorToggle }) {
 
       {/* Bileşenler */}
       {vis.frame && (
-        <WoodFrame showScrews={vis.screws} />
+        <WoodFrame showScrews={false} />
       )}
       {vis.panels && <PolycarbonatePanels />}
       {vis.door && (
-        <DoorSystem open={doorOpen} onToggle={onDoorToggle} showScrews={vis.screws} />
+        <DoorSystem open={doorOpen} onToggle={onDoorToggle} showScrews={false} />
       )}
-      {vis.fans && <Fans />}
+      {vis.fans && <Fans fanPwm={fanPwm} />}
       {vis.electronics && <Electronics />}
       {vis.irrigation && <IrrigationSystem />}
       {vis.plants && <Plants />}

@@ -1,0 +1,11 @@
+http:
+  middlewares:
+    office-ip:                 # mlflow & optuna IP kısıtı (NPM "allow" karşılığı)
+      ipAllowList:
+        sourceRange:
+          - 88.244.126.157/32
+    hsts:                      # NPM HSTS başlığı karşılığı
+      headers:
+        stsSeconds: 63072000
+        stsPreload: true
+        stsIncludeSubdomains: true

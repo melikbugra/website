@@ -1,0 +1,31 @@
+services:
+  traefik:
+    image: traefik:v3.3
+    container_name: traefik
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./dynamic:/etc/traefik/dynamic:ro
+      - ./letsencrypt:/letsencrypt
+    networks:
+      - web
+    labels:
+      - "traefik.enable=true"
+      # Dashboard -> proxyserver.* (IP kısıtlı + basic auth)
+      - "traefik.http.routers.dashboard.rule=Host(`proxyserver.melikbugraozcelik.com`)"
+      - "traefik.http.routers.dashboard.entrypoints=websecure"
+      - "traefik.http.routers.dashboard.tls.certresolver=le"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.middlewares=office-ip@file,dashboard-auth"
+      # Basic auth: aşağıdaki hash'i kendi parolanla değiştir:
+      #   htpasswd -nbB admin 'PAROLA' | sed -e 's/\$/\$\$/g'
+      - "traefik.http.middlewares.dashboard-auth.basicauth.users=admin:$$2y$$05$$ElHn/tZx68zYw9gUMK9pZ.cISyKNFtAH.rE/7RUePHF0zvQanFVia"
+
+networks:
+  web:
+    external: true
+    name: traefik-proxy

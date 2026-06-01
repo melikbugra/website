@@ -83,26 +83,29 @@ function Fan120mm({ position, rotation = [0, 0, 0], speed = 8 }) {
   )
 }
 
-export default function Fans() {
+export default function Fans({ fanPwm = null }) {
+  // fanPwm null ise (canlı veri yok) görsel amaçlı sabit hızda döndür;
+  // canlı veri varsa hızı PWM ile (0-255) orantıla.
+  const factor = fanPwm == null ? 1 : Math.max(0, Math.min(1, fanPwm / 255))
   return (
     <group>
       {/* Egzoz fan 1 — tavanda sol, aşağı bakıyor */}
       <Fan120mm
         position={[-W / 4, H - 0.013, 0]}
         rotation={[Math.PI / 2, 0, 0]}
-        speed={9}
+        speed={9 * factor}
       />
       {/* Egzoz fan 2 — tavanda sağ */}
       <Fan120mm
         position={[W / 4, H - 0.013, 0]}
         rotation={[Math.PI / 2, 0, 0]}
-        speed={9}
+        speed={9 * factor}
       />
       {/* Intake fan — arka alt duvar */}
       <Fan120mm
         position={[0, 0.2, -D / 2 + 0.013]}
         rotation={[0, 0, 0]}
-        speed={7}
+        speed={7 * factor}
       />
     </group>
   )

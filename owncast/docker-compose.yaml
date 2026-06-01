@@ -9,8 +9,15 @@ services:
       - ./data:/app/data
     networks:
       - web
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.owncast.rule=Host(`stream.melikbugraozcelik.com`)"
+      - "traefik.http.routers.owncast.entrypoints=websecure"
+      - "traefik.http.routers.owncast.tls.certresolver=le"
+      - "traefik.http.routers.owncast.middlewares=hsts@file"
+      - "traefik.http.services.owncast.loadbalancer.server.port=8080"
 
 networks:
   web:
     external: true
-    name: nginxproxymanager_default
+    name: traefik-proxy

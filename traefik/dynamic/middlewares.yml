@@ -4,6 +4,7 @@ http:
       ipAllowList:
         sourceRange:
           - 88.244.126.157/32
+          - 85.99.206.188/32
     hsts:                      # NPM HSTS başlığı karşılığı
       headers:
         stsSeconds: 63072000

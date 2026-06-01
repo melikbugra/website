@@ -6,7 +6,7 @@ services:
     container_name: openvpn
     cap_add:
       - NET_ADMIN
-    restart: always
+    restart: unless-stopped
     ports:
       - "1194:1194/udp"
     volumes:

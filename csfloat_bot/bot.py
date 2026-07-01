@@ -45,6 +45,9 @@ from urllib.parse import quote as url_quote
 import aiohttp
 from dotenv import load_dotenv
 
+from momentum import MomentumStrategy
+from pricedb import PriceDB
+
 
 # ── Filters ───────────────────────────────────────────────────────────────────
 
@@ -54,12 +57,27 @@ from dotenv import load_dotenv
 MIN_PROFIT_MARGIN: float = 0.06
 
 _WEAR_FLOAT_BOUNDS: dict[str, tuple[float, float]] = {
-    "Factory New":    (0.00, 0.07),
-    "Minimal Wear":   (0.07, 0.15),
-    "Field-Tested":   (0.15, 0.38),
-    "Well-Worn":      (0.38, 0.45),
+    "Factory New": (0.00, 0.07),
+    "Minimal Wear": (0.07, 0.15),
+    "Field-Tested": (0.15, 0.38),
+    "Well-Worn": (0.38, 0.45),
     "Battle-Scarred": (0.45, 1.00),
 }
+
+
+def _to_bool(s: str) -> bool:
+    """/set anahtarları için on/off ayrıştırıcı (bool('0') tuzağını önler)."""
+    v = s.strip().lower()
+    if v in ("1", "true", "on", "açık", "acik", "yes", "evet"):
+        return True
+    if v in ("0", "false", "off", "kapalı", "kapali", "no", "hayır", "hayir"):
+        return False
+    raise ValueError("on/off")
+
+
+def _strategy_badge(strategy: str | None) -> str:
+    """Bildirimlerde gösterilecek strateji etiketi."""
+    return "📉 Mean-reversion" if strategy == "momentum" else "🎯 Sniper"
 
 
 def _float_tier_position(float_val: float, item_name: str) -> float | None:
@@ -69,17 +87,18 @@ def _float_tier_position(float_val: float, item_name: str) -> float | None:
             return (float_val - lo) / (hi - lo)
     return None
 
+
 # Minimum active CSFloat listings for an item (reference.quantity)
 # 200+ = sadece çok likit item'lar (likit olmazsa satış için günler bekleyebilirsin)
 MIN_VOLUME: int = 200
 
 # Minimum base_price to be considered (cents)
 # Filters out junk items that have no real reference data
-MIN_FAIR_VALUE: int = 20   # $0.20
+MIN_FAIR_VALUE: int = 20  # $0.20
 
 # Price range gate — never buy outside this band regardless of other filters
-MIN_ITEM_PRICE: int = 10    # $0.10 — below this there's no profit potential
-MAX_ITEM_PRICE: int = 500  # $5.00 — safety cap per item
+MIN_ITEM_PRICE: int = 100  # $0.10 — below this there's no profit potential
+MAX_ITEM_PRICE: int = 600  # $5.00 — safety cap per item
 
 # Minimum balance to keep in reserve (cents) — bot won't buy if it would drop below this
 # 500 = always keep $5.00 untouched
@@ -136,7 +155,8 @@ class BotConfig:
 
     # ── Polling settings ──────────────────────────────────────────────────────
     poll_interval: float = 15.0
-    poll_pages: int = 1        # page 1 always has the newest listings
+    poll_interval_idle: float = 90.0  # sniper kapalıyken poller bu kadar yavaş döner
+    poll_pages: int = 1  # page 1 always has the newest listings
     listings_url: str = (
         "https://csfloat.com/api/v1/listings?sort_by=most_recent&limit=50"
     )
@@ -145,38 +165,64 @@ class BotConfig:
     buy_url: str = "https://csfloat.com/api/v1/listings/buy"
     me_url: str = "https://csfloat.com/api/v1/me"
     rate_limit_pause: float = 60.0
-    balance_refresh_interval: float = 300.0   # re-fetch balance every 5 minutes
-    min_balance_reserve: int = 500   # never spend below this balance (cents)
+    balance_refresh_interval: float = 300.0  # re-fetch balance every 5 minutes
+    min_balance_reserve: int = 500  # never spend below this balance (cents)
     max_seen_ids: int = 10_000
 
     # ── Portfolio management (post-buy lifecycle) ─────────────────────────────
     inventory_url: str = "https://csfloat.com/api/v1/me/inventory"
     # Stall is per-user: GET /api/v1/users/{steam_id}/stall?limit=40
-    stall_url_template: str = "https://csfloat.com/api/v1/users/{steam_id}/stall?limit=100"
+    stall_url_template: str = (
+        "https://csfloat.com/api/v1/users/{steam_id}/stall?limit=100"
+    )
     listings_create_url: str = "https://csfloat.com/api/v1/listings"  # POST to create
     data_dir: str = "data"
-    trade_hold_buffer_days: int = 8         # 7-day Steam + 1-day safety
+    trade_hold_buffer_days: int = 8  # 7-day Steam + 1-day safety
 
     # Listing fiyat fazları (markup over base_price_at_buy)
-    phase_1_markup: float = 1.08            # gün 0-3: yüksek marj, sabırlı
-    phase_2_markup: float = 1.05            # gün 3-7: ılımlı
-    phase_3_undercut_cents: int = 1         # gün 7-14: en ucuzdan 1¢ altında
-    min_listing_markup: float = 1.03        # her zaman alımın en az %3 üstünde
+    phase_1_markup: float = 1.08  # gün 0-3: yüksek marj, sabırlı
+    phase_2_markup: float = 1.05  # gün 3-7: ılımlı
+    phase_3_undercut_cents: int = 1  # gün 7-14: en ucuzdan 1¢ altında
+    min_listing_markup: float = 1.03  # her zaman alımın en az %3 üstünde
     phase_1_duration_days: int = 3
-    phase_2_duration_days: int = 4          # day 3 → 7
-    phase_3_duration_days: int = 7          # day 7 → 14
+    phase_2_duration_days: int = 4  # day 3 → 7
+    phase_3_duration_days: int = 7  # day 7 → 14
 
     # Worker intervals (saniye)
-    listing_worker_interval: float = 3600.0     # 1 saat
-    sales_worker_interval: float = 3600.0       # 1 saat
+    listing_worker_interval: float = 3600.0  # 1 saat
+    sales_worker_interval: float = 3600.0  # 1 saat
     repricing_worker_interval: float = 86400.0  # 1 gün
-    inventory_resolve_delay: float = 30.0       # buy → inventory query gecikme
-    inventory_resolve_retries: int = 6          # fast-path: 6 × 30s = 3 dakika
-    pending_trade_retry_interval: float = 300.0 # slow-path: 5 dakikada bir tekrar dene
-    pending_trade_max_age_hours: int = 24       # 24 saat sonra umudu kes (CSFloat zaten refund eder)
-    csfloat_seller_fee: float = 0.02            # CSFloat satıcı komisyonu (%2)
-    float_low_threshold: float = 0.33           # tier içinde alt %33 = "düşük float"
-    float_low_premium: float = 1.10             # düşük float için liste fiyatı +%10
+    inventory_resolve_delay: float = 30.0  # buy → inventory query gecikme
+    inventory_resolve_retries: int = 6  # fast-path: 6 × 30s = 3 dakika
+    pending_trade_retry_interval: float = 300.0  # slow-path: 5 dakikada bir tekrar dene
+    pending_trade_max_age_hours: int = (
+        24  # 24 saat sonra umudu kes (CSFloat zaten refund eder)
+    )
+    csfloat_seller_fee: float = 0.02  # CSFloat satıcı komisyonu (%2)
+    float_low_threshold: float = 0.33  # tier içinde alt %33 = "düşük float"
+    float_low_premium: float = 1.10  # düşük float için liste fiyatı +%10
+
+    # ── Strateji anahtarları (canlı /set ile aç/kapa) ─────────────────────────
+    sniper_enabled: bool = True  # eski "en ucuzun altını kap" stratejisi
+    mr_enabled: bool = True  # mean-reversion stratejisi
+
+    # ── Mean-reversion strateji (sniper'ın YANINDA, ayrı bütçe) ───────────────
+    steam_cookies: str = ""  # steamLoginSecure vb. (boşsa salt-CSFloat mod)
+    mr_budget_cents: int = 5000  # bu stratejinin ayrı kasa tavanı ($50)
+    mr_lookback_days: int = 60  # z-score baseline penceresi
+    mr_trend_days: int = 90  # düşen-bıçak filtresi penceresi
+    mr_min_points: int = 10  # istatistik için min veri noktası
+    mr_z_entry: float = -1.5  # bu kadar SS altı = "geçici dip" → al
+    mr_min_volume: int = 20  # günlük likidite kapısı (çıkış garantisi)
+    mr_slope_min: float = (
+        -0.003
+    )  # normalize trend eğimi ≥ bu (≈-0.3%/gün; düz≈0 geçer, çöküş reddedilir)
+    mr_min_profit_margin: float = 0.10  # baseline'a dönüşte beklenen net kâr
+    mr_tick_interval: float = (
+        60.0  # watchlist'te item başına işleme aralığı (burst yok)
+    )
+    mr_warmup_interval: float = 1800.0  # watchlist boşsa bu kadar bekle
+    mr_watchlist_max: int = 60  # izlenen item üst sınırı (rate-limit dostu)
 
     def auth_header_value(self) -> str | None:
         """
@@ -208,12 +254,22 @@ class BotConfig:
             logger.info("Auth: using token (%s...)", token[:8])
         else:
             logger.info("Auth: cookie-only mode")
+        steam_cookies = os.getenv("STEAM_COOKIES", "").strip()
+        if steam_cookies:
+            logger.info("Mean-reversion: Steam history enabled (deep bootstrap)")
+        else:
+            logger.info(
+                "Mean-reversion: STEAM_COOKIES not set — CSFloat-only mode "
+                "(no deep history; signals after ~3-4 weeks of self-collected data)"
+            )
         tg_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
-        tg_chat  = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+        tg_chat = os.getenv("TELEGRAM_CHAT_ID", "").strip()
         if tg_token and tg_chat:
             logger.info("Telegram notifications: enabled (chat_id=%s)", tg_chat)
         else:
-            logger.info("Telegram notifications: disabled (set TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID to enable)")
+            logger.info(
+                "Telegram notifications: disabled (set TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID to enable)"
+            )
         return cls(
             bearer_token=token,
             cookies=cookies,
@@ -225,6 +281,7 @@ class BotConfig:
             telegram_bot_token=tg_token,
             telegram_chat_id=tg_chat,
             min_balance_reserve=MIN_BALANCE_RESERVE,
+            steam_cookies=steam_cookies,
         )
 
 
@@ -235,23 +292,27 @@ class BotConfig:
 class BoughtItem:
     """One item the bot bought — tracked through its lifecycle until sold."""
 
-    asset_id: str = ""              # Steam inventory asset id (empty until resolved)
-    contract_id_buy: str = ""       # CSFloat listing id we bought FROM
+    asset_id: str = ""  # Steam inventory asset id (empty until resolved)
+    contract_id_buy: str = ""  # CSFloat listing id we bought FROM
     item_name: str = ""
-    buy_price: int = 0              # cents we paid
-    base_price_at_buy: int = 0      # market base_price when we bought (for repricing)
-    bought_at: str = ""             # ISO-8601 UTC
-    trade_unlock_at: str = ""       # ISO-8601 UTC (Steam tradable_at + safety)
-    status: str = "pending_asset"   # pending_asset | locked | listed | sold | skipped | failed
-    listing_id_sell: str | None = None   # CSFloat listing id we created when selling
+    buy_price: int = 0  # cents we paid
+    base_price_at_buy: int = 0  # market base_price when we bought (for repricing)
+    bought_at: str = ""  # ISO-8601 UTC
+    trade_unlock_at: str = ""  # ISO-8601 UTC (Steam tradable_at + safety)
+    status: str = (
+        "pending_asset"  # pending_asset | locked | listed | sold | skipped | failed
+    )
+    listing_id_sell: str | None = None  # CSFloat listing id we created when selling
     list_price: int | None = None
     listed_at: str | None = None
-    current_phase: int | None = None     # 1, 2, 3 (or None when not listed)
+    current_phase: int | None = None  # 1, 2, 3 (or None when not listed)
     sold_at: str | None = None
-    net_profit: int | None = None        # cents, after CSFloat fee
+    net_profit: int | None = None  # cents, after CSFloat fee
     error_count: int = 0
     last_error: str = ""
     float_value: float | None = None
+    strategy: str = "sniper"  # "sniper" | "momentum"
+    target_price: int | None = None  # momentum: baseline-at-buy = satış hedefi
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -280,14 +341,18 @@ class BoughtItemsTracker:
 
     def _load(self) -> None:
         if not self._file.exists():
-            logger.info("BoughtItems: no existing file at %s — starting fresh", self._file)
+            logger.info(
+                "BoughtItems: no existing file at %s — starting fresh", self._file
+            )
             return
         try:
             with self._file.open("r", encoding="utf-8") as f:
                 data = json.load(f)
             for k, v in data.items():
                 self._items[k] = BoughtItem.from_dict(v)
-            logger.info("BoughtItems: loaded %d items from %s", len(self._items), self._file)
+            logger.info(
+                "BoughtItems: loaded %d items from %s", len(self._items), self._file
+            )
         except Exception as exc:
             logger.error("BoughtItems: failed to load %s: %s", self._file, exc)
 
@@ -309,6 +374,8 @@ class BoughtItemsTracker:
         buy_price: int,
         base_price: int,
         float_value: float | None = None,
+        strategy: str = "sniper",
+        target_price: int | None = None,
     ) -> str:
         """Insert a freshly-bought item before asset_id is known. Returns lookup key."""
         async with self._lock:
@@ -322,11 +389,15 @@ class BoughtItemsTracker:
                 bought_at=now,
                 status="pending_asset",
                 float_value=float_value,
+                strategy=strategy,
+                target_price=target_price,
             )
             await self._save()
             return key
 
-    async def resolve_asset(self, pending_key: str, asset_id: str, trade_unlock_at: str) -> None:
+    async def resolve_asset(
+        self, pending_key: str, asset_id: str, trade_unlock_at: str
+    ) -> None:
         """Promote a pending item to locked by attaching asset_id + unlock time."""
         async with self._lock:
             item = self._items.pop(pending_key, None)
@@ -336,6 +407,16 @@ class BoughtItemsTracker:
             item.trade_unlock_at = trade_unlock_at
             item.status = "locked"
             self._items[asset_id] = item
+            await self._save()
+
+    async def rekey_asset(self, old_key: str, new_asset_id: str) -> None:
+        """Re-key an item under a new asset_id (Steam reassigns ids on unlock)."""
+        async with self._lock:
+            item = self._items.pop(old_key, None)
+            if item is None:
+                return
+            item.asset_id = new_asset_id
+            self._items[new_asset_id] = item
             await self._save()
 
     async def update(self, key: str, **changes) -> None:
@@ -396,8 +477,10 @@ class BoughtItemsTracker:
 class TelegramNotifier:
     _API = "https://api.telegram.org/bot{token}/sendMessage"
 
-    def __init__(self, token: str, chat_id: str, session: aiohttp.ClientSession) -> None:
-        self._token   = token
+    def __init__(
+        self, token: str, chat_id: str, session: aiohttp.ClientSession
+    ) -> None:
+        self._token = token
         self._chat_id = chat_id
         self._session = session
         self._enabled = bool(token and chat_id)
@@ -413,60 +496,83 @@ class TelegramNotifier:
             ) as resp:
                 if resp.status != 200:
                     body = await resp.text()
-                    logger.warning("Telegram notification failed (HTTP %d): %s", resp.status, body[:200])
+                    logger.warning(
+                        "Telegram notification failed (HTTP %d): %s",
+                        resp.status,
+                        body[:200],
+                    )
         except Exception as exc:
             logger.warning("Telegram send error: %s", exc)
 
     async def send_startup(self, config: "BotConfig", balance: int) -> None:
         text = (
             f"🤖 <b>CSFloat Bot Başladı</b>\n\n"
-            f"⚙️ Margin: <b>{config.min_profit_margin*100:.0f}%</b>  |  "
+            f"⚙️ Margin: <b>{config.min_profit_margin * 100:.0f}%</b>  |  "
             f"Vol≥{config.min_volume}  |  Fair≥{config.min_fair_value}¢\n"
-            f"💰 Bakiye: <b>${balance/100:.2f}</b>\n"
+            f"💰 Bakiye: <b>${balance / 100:.2f}</b>\n"
             f"📡 Poll: {config.poll_interval}s  |  {config.poll_pages} sayfa"
         )
         await self._post(text)
 
     async def send_buy(self, listing: dict, balance_left: int) -> None:
-        name      = listing["item_name"]
-        price     = listing["price"]
-        fair      = listing.get("fair_value") or 0
+        name = listing["item_name"]
+        price = listing["price"]
+        fair = listing.get("fair_value") or 0
         float_val = listing.get("float_value")
-        discount  = (1 - price / fair) * 100 if fair else 0.0
+        discount = (1 - price / fair) * 100 if fair else 0.0
         float_str = f"{float_val:.6f}" if float_val is not None else "n/a"
+        badge = _strategy_badge(listing.get("strategy"))
+        reason = listing.get("buy_reason", "")
+        fair_label = "Baseline" if listing.get("strategy") == "momentum" else "Fair"
         text = (
-            f"🛒 <b>SATIN ALINDI</b>\n\n"
+            f"🛒 <b>SATIN ALINDI</b> · {badge}\n\n"
             f"📦 {name}\n"
-            f"💰 Fiyat: <b>${price/100:.2f}</b>  |  Fair: ${fair/100:.2f}  |  <b>-{discount:.1f}%</b>\n"
+            f"💰 Fiyat: <b>${price / 100:.2f}</b>  |  {fair_label}: ${fair / 100:.2f}  |  <b>-{discount:.1f}%</b>\n"
             f"🔬 Float: {float_str}\n"
-            f"💼 Kalan bakiye: <b>${balance_left/100:.2f}</b>"
+            f"🧮 Neden: {reason}\n"
+            f"💼 Kalan bakiye: <b>${balance_left / 100:.2f}</b>"
         )
         await self._post(text)
 
     async def send_match(self, listing: dict) -> None:
-        name      = listing["item_name"]
-        price     = listing["price"]
-        fair      = listing.get("fair_value") or 0
+        name = listing["item_name"]
+        price = listing["price"]
+        fair = listing.get("fair_value") or 0
         float_val = listing.get("float_value")
-        discount  = (1 - price / fair) * 100 if fair else 0.0
+        discount = (1 - price / fair) * 100 if fair else 0.0
         float_str = f"{float_val:.6f}" if float_val is not None else "n/a"
-        vol       = listing.get("volume", 0)
+        vol = listing.get("volume", 0)
+        is_mr = listing.get("strategy") == "momentum"
+        badge = _strategy_badge(listing.get("strategy"))
+        fair_label = "Baseline" if is_mr else "Fair"
+        reason = listing.get("buy_reason", "")
+        reason_line = f"\n🧮 Neden: {reason}" if reason else ""
         text = (
-            f"🎯 <b>FIRSAT BULUNDU</b>\n\n"
+            f"🎯 <b>FIRSAT BULUNDU</b> · {badge}\n\n"
             f"📦 {name}\n"
-            f"💰 Fiyat: <b>${price/100:.2f}</b>  |  Fair: ${fair/100:.2f}  |  <b>-{discount:.1f}%</b>\n"
-            f"🔬 Float: {float_str}  |  Vol: {vol}\n"
+            f"💰 Fiyat: <b>${price / 100:.2f}</b>  |  {fair_label}: ${fair / 100:.2f}  |  <b>-{discount:.1f}%</b>\n"
+            f"🔬 Float: {float_str}  |  Vol: {vol}{reason_line}\n"
             f"⏳ Satın alınıyor..."
         )
         await self._post(text)
 
+    async def send_momentum_summary(
+        self, scanned: int, signals: int, bought: int, used: int, budget: int
+    ) -> None:
+        text = (
+            f"📊 <b>MEAN-REVERSION TARAMA</b>\n\n"
+            f"🔍 Taranan: {scanned}  |  Sinyal: {signals}  |  Alım: {bought}\n"
+            f"💼 Momentum kasa: <b>${used / 100:.2f}</b> / ${budget / 100:.2f}"
+        )
+        await self._post(text)
+
     async def send_buy_failed(self, listing: dict, reason: str) -> None:
-        name  = listing["item_name"]
+        name = listing["item_name"]
         price = listing["price"]
         text = (
             f"❌ <b>SATIN ALINAMADI</b>\n\n"
             f"📦 {name}\n"
-            f"💰 Fiyat: ${price/100:.2f}\n"
+            f"💰 Fiyat: ${price / 100:.2f}\n"
             f"⚠️ {reason}"
         )
         await self._post(text)
@@ -477,25 +583,36 @@ class TelegramNotifier:
 
     async def send_listed(self, item: BoughtItem, price: int, phase: int) -> None:
         expected_net = int(price * 0.98) - item.buy_price
+        badge = _strategy_badge(item.strategy)
         float_line = ""
         if item.float_value is not None:
             pos = _float_tier_position(item.float_value, item.item_name)
             premium_str = " (+prim)" if (pos is not None and pos < 0.33) else ""
             float_line = f"\n🔬 Float: {item.float_value:.6f}{premium_str}"
+        # Satış fiyatının nereden geldiğini açıkla
+        if item.strategy == "momentum" and item.target_price:
+            logic_line = (
+                f"\n🎯 Hedef: baseline ${item.target_price / 100:.2f} (toparlamada sat)"
+            )
+        else:
+            logic_line = ""
         text = (
-            f"📤 <b>LİSTELENDİ</b> (Faz {phase})\n\n"
+            f"📤 <b>LİSTELENDİ</b> (Faz {phase}) · {badge}\n\n"
             f"📦 {item.item_name}\n"
-            f"💰 Alım: ${item.buy_price/100:.2f}  →  Liste: <b>${price/100:.2f}</b>\n"
-            f"📈 Beklenen net kâr: <b>${expected_net/100:+.2f}</b>"
+            f"💰 Alım: ${item.buy_price / 100:.2f}  →  Liste: <b>${price / 100:.2f}</b>\n"
+            f"📈 Beklenen net kâr: <b>${expected_net / 100:+.2f}</b>"
+            f"{logic_line}"
             f"{float_line}"
         )
         await self._post(text)
 
-    async def send_repriced(self, item: BoughtItem, old_price: int, new_price: int, phase: int) -> None:
+    async def send_repriced(
+        self, item: BoughtItem, old_price: int, new_price: int, phase: int
+    ) -> None:
         text = (
-            f"🔄 <b>YENİDEN FİYATLANDI</b> (Faz {phase})\n\n"
+            f"🔄 <b>YENİDEN FİYATLANDI</b> (Faz {phase}) · {_strategy_badge(item.strategy)}\n\n"
             f"📦 {item.item_name}\n"
-            f"💰 ${old_price/100:.2f} → <b>${new_price/100:.2f}</b>"
+            f"💰 ${old_price / 100:.2f} → <b>${new_price / 100:.2f}</b>"
         )
         await self._post(text)
 
@@ -504,10 +621,10 @@ class TelegramNotifier:
         sign = "+" if net >= 0 else ""
         emoji = "✅" if net >= 0 else "⚠️"
         text = (
-            f"{emoji} <b>SATILDI</b>\n\n"
+            f"{emoji} <b>SATILDI</b> · {_strategy_badge(item.strategy)}\n\n"
             f"📦 {item.item_name}\n"
-            f"💰 Alım: ${item.buy_price/100:.2f}  →  Satış: ${(item.list_price or 0)/100:.2f}\n"
-            f"📊 Net kâr: <b>{sign}${net/100:.2f}</b>"
+            f"💰 Alım: ${item.buy_price / 100:.2f}  →  Satış: ${(item.list_price or 0) / 100:.2f}\n"
+            f"📊 Net kâr: <b>{sign}${net / 100:.2f}</b>"
         )
         await self._post(text)
 
@@ -516,15 +633,17 @@ class TelegramNotifier:
             f"⚠️ <b>MANUEL İNCELEME GEREK</b>\n\n"
             f"📦 {item.item_name}\n"
             f"{days_listed} gündür satılmıyor. Bot artık dokunmuyor.\n"
-            f"Liste fiyatı: ${(item.list_price or 0)/100:.2f}  |  Alım: ${item.buy_price/100:.2f}"
+            f"Liste fiyatı: ${(item.list_price or 0) / 100:.2f}  |  Alım: ${item.buy_price / 100:.2f}"
         )
         await self._post(text)
 
-    async def send_idle(self, balance: int, pending: int, locked: int, listed: int) -> None:
+    async def send_idle(
+        self, balance: int, pending: int, locked: int, listed: int
+    ) -> None:
         text = (
             f"💤 <b>Bot Boşta</b>\n\n"
             f"Bakiye yeterli alım için yetersiz, locked/listed item'lar bekliyor.\n\n"
-            f"💰 Bakiye: ${balance/100:.2f}\n"
+            f"💰 Bakiye: ${balance / 100:.2f}\n"
             f"⏳ Locked: {locked}  |  📤 Listed: {listed}  |  ⌛ Pending: {pending}\n\n"
             f"<i>Bot açık kalabilir veya kapatılabilir — fark etmez.</i>"
         )
@@ -554,15 +673,20 @@ class TelegramNotifier:
 
 class TelegramCommandHandler:
     _UPDATES_URL = "https://api.telegram.org/bot{token}/getUpdates"
-    _SEND_URL    = "https://api.telegram.org/bot{token}/sendMessage"
+    _SEND_URL = "https://api.telegram.org/bot{token}/sendMessage"
 
     PARAMS: dict[str, tuple[str, type, str]] = {
-        "margin":    ("min_profit_margin",  float, "ör. 0.20"),
-        "volume":    ("min_volume",         int,   "ör. 50"),
-        "fair":      ("min_fair_value",     int,   "ör. 20"),
-        "min_price": ("min_item_price",     int,   "ör. 10 (¢)"),
-        "max_price": ("max_item_price",     int,   "ör. 1000 (¢)"),
-        "reserve":   ("min_balance_reserve",int,   "ör. 500 (¢ = $5.00)"),
+        "margin": ("min_profit_margin", float, "ör. 0.20"),
+        "volume": ("min_volume", int, "ör. 50"),
+        "fair": ("min_fair_value", int, "ör. 20"),
+        "min_price": ("min_item_price", int, "ör. 10 (¢)"),
+        "max_price": ("max_item_price", int, "ör. 1000 (¢)"),
+        "reserve": ("min_balance_reserve", int, "ör. 500 (¢ = $5.00)"),
+        "sniper": ("sniper_enabled", _to_bool, "on/off"),
+        "momentum": ("mr_enabled", _to_bool, "on/off"),
+        "mr_budget": ("mr_budget_cents", int, "ör. 5000 (¢ = $50)"),
+        "poll": ("poll_interval", float, "ör. 15 (s)"),
+        "poll_idle": ("poll_interval_idle", float, "ör. 90 (s, sniper kapalıyken)"),
     }
 
     def __init__(
@@ -575,15 +699,15 @@ class TelegramCommandHandler:
         portfolio: "PortfolioManager | None" = None,
         executor: "ExecutionModule | None" = None,
     ) -> None:
-        self._token   = token
+        self._token = token
         self._chat_id = chat_id
-        self._config  = config
+        self._config = config
         self._session = session
         self._enabled = bool(token and chat_id)
-        self._offset  = 0
-        self._tracker   = tracker
+        self._offset = 0
+        self._tracker = tracker
         self._portfolio = portfolio
-        self._executor  = executor
+        self._executor = executor
 
     async def listen(self) -> None:
         if not self._enabled:
@@ -646,7 +770,9 @@ class TelegramCommandHandler:
     async def _handle_set(self, args: str) -> None:
         parts = args.split()
         if len(parts) != 2:
-            await self._reply("❌ Kullanım: <code>/set &lt;parametre&gt; &lt;değer&gt;</code>")
+            await self._reply(
+                "❌ Kullanım: <code>/set &lt;parametre&gt; &lt;değer&gt;</code>"
+            )
             return
         key, val_str = parts[0].lower(), parts[1]
         if key not in self.PARAMS:
@@ -671,9 +797,11 @@ class TelegramCommandHandler:
             f"<code>margin    = {c.min_profit_margin:.0%}</code>\n"
             f"<code>volume    = {c.min_volume}</code>\n"
             f"<code>fair      = {c.min_fair_value}¢</code>\n"
-            f"<code>min_price = {c.min_item_price}¢  (${c.min_item_price/100:.2f})</code>\n"
-            f"<code>max_price = {c.max_item_price}¢  (${c.max_item_price/100:.2f})</code>\n"
-            f"<code>reserve   = {c.min_balance_reserve}¢  (${c.min_balance_reserve/100:.2f})</code>"
+            f"<code>min_price = {c.min_item_price}¢  (${c.min_item_price / 100:.2f})</code>\n"
+            f"<code>max_price = {c.max_item_price}¢  (${c.max_item_price / 100:.2f})</code>\n"
+            f"<code>reserve   = {c.min_balance_reserve}¢  (${c.min_balance_reserve / 100:.2f})</code>\n"
+            f"<code>sniper    = {'ON' if c.sniper_enabled else 'OFF'}</code>\n"
+            f"<code>momentum  = {'ON' if c.mr_enabled else 'OFF'}  (budget ${c.mr_budget_cents / 100:.2f})</code>"
         )
         await self._reply(text)
 
@@ -694,6 +822,10 @@ class TelegramCommandHandler:
             "/set min_price 10\n"
             "/set max_price 1000\n"
             "/set reserve 500\n\n"
+            "<b>Strateji aç/kapa:</b>\n"
+            "/set sniper off — eski 'en ucuzun altını kap' stratejisi\n"
+            "/set momentum on — mean-reversion stratejisi\n"
+            "/set mr_budget 5000 — momentum kasası (¢)\n\n"
             "<i>Fiyatlar ¢ (cent) cinsinden — $1.00 = 100</i>"
         )
         await self._reply(text)
@@ -703,37 +835,40 @@ class TelegramCommandHandler:
             await self._reply("⚠️ Tracker hazır değil")
             return
         pending = self._tracker.by_status("pending_asset")
-        locked  = self._tracker.by_status("locked")
-        listed  = self._tracker.by_status("listed")
+        locked = self._tracker.by_status("locked")
+        listed = self._tracker.by_status("listed")
         invested = self._tracker.total_invested_in_active()
         expected_net = sum(
-            int((it.list_price or 0) * (1 - self._config.csfloat_seller_fee)) - it.buy_price
+            int((it.list_price or 0) * (1 - self._config.csfloat_seller_fee))
+            - it.buy_price
             for it in listed
         )
 
         lines: list[str] = [
             f"📊 <b>Portfolio</b>\n",
-            f"💼 Aktif yatırım: <b>${invested/100:.2f}</b>",
+            f"💼 Aktif yatırım: <b>${invested / 100:.2f}</b>",
             f"⌛ Pending: {len(pending)}  |  ⏳ Locked: {len(locked)}  |  📤 Listed: {len(listed)}",
-            f"📈 Beklenen net kâr (listedeki): <b>${expected_net/100:+.2f}</b>",
+            f"📈 Beklenen net kâr (listedeki): <b>${expected_net / 100:+.2f}</b>",
         ]
 
         if locked:
             lines.append("\n<b>🔒 Kilitli (trade hold)</b>")
             for it in locked[:5]:
                 unlock_str = it.trade_unlock_at[:10] if it.trade_unlock_at else "?"
-                lines.append(f"  • {it.item_name[:40]} — ${it.buy_price/100:.2f} (açılır: {unlock_str})")
+                lines.append(
+                    f"  • {it.item_name[:40]} — ${it.buy_price / 100:.2f} (açılır: {unlock_str})"
+                )
             if len(locked) > 5:
-                lines.append(f"  <i>… +{len(locked)-5} adet</i>")
+                lines.append(f"  <i>… +{len(locked) - 5} adet</i>")
 
         if listed:
             lines.append("\n<b>📤 Listede</b>")
             for it in listed[:5]:
                 lines.append(
-                    f"  • {it.item_name[:40]} — alım ${it.buy_price/100:.2f} → liste ${(it.list_price or 0)/100:.2f} (Faz {it.current_phase or 1})"
+                    f"  • {it.item_name[:40]} — alım ${it.buy_price / 100:.2f} → liste ${(it.list_price or 0) / 100:.2f} (Faz {it.current_phase or 1})"
                 )
             if len(listed) > 5:
-                lines.append(f"  <i>… +{len(listed)-5} adet</i>")
+                lines.append(f"  <i>… +{len(listed) - 5} adet</i>")
 
         await self._reply("\n".join(lines))
 
@@ -763,12 +898,16 @@ class TelegramCommandHandler:
             1
             for it in self._tracker.by_status("sold")
             if since is None
-            or (it.sold_at and PortfolioManager._parse_iso(it.sold_at) and PortfolioManager._parse_iso(it.sold_at) >= since)
+            or (
+                it.sold_at
+                and PortfolioManager._parse_iso(it.sold_at)
+                and PortfolioManager._parse_iso(it.sold_at) >= since
+            )
         )
         sign = "+" if net >= 0 else ""
         await self._reply(
             f"💰 <b>{label}</b>\n\n"
-            f"Net kâr: <b>{sign}${net/100:.2f}</b>\n"
+            f"Net kâr: <b>{sign}${net / 100:.2f}</b>\n"
             f"Satılan item: {sold_count}"
         )
 
@@ -799,7 +938,9 @@ class TelegramCommandHandler:
             return
         ok = await self._tracker.mark_skipped(asset_id)
         if ok:
-            await self._reply(f"✅ <code>{asset_id}</code> skipped — bot artık bu item'a dokunmayacak")
+            await self._reply(
+                f"✅ <code>{asset_id}</code> skipped — bot artık bu item'a dokunmayacak"
+            )
         else:
             await self._reply(f"❌ asset_id bulunamadı: <code>{asset_id}</code>")
 
@@ -812,7 +953,9 @@ class TelegramCommandHandler:
             ) as resp:
                 if resp.status != 200:
                     body = await resp.text()
-                    logger.warning("Telegram reply failed (HTTP %d): %s", resp.status, body[:200])
+                    logger.warning(
+                        "Telegram reply failed (HTTP %d): %s", resp.status, body[:200]
+                    )
         except Exception as exc:
             logger.warning("Telegram reply error: %s", exc)
 
@@ -864,14 +1007,18 @@ class DecisionEngine:
             predicted = ref.get("predicted_price")
             base = ref.get("base_price")
             keychain = int(ref.get("keychain_price") or 0)
-            effective_base = (int(base) + keychain) if base and int(base) > 0 else keychain
+            effective_base = (
+                (int(base) + keychain) if base and int(base) > 0 else keychain
+            )
             fair_value: int | None = None
             if effective_base > 0:
                 fair_value = effective_base
             elif predicted and int(predicted) > 0:
                 fair_value = int(predicted)
 
-            base_price_int: int = effective_base if effective_base > 0 else (fair_value or price)
+            base_price_int: int = (
+                effective_base if effective_base > 0 else (fair_value or price)
+            )
             volume: int = int(ref.get("quantity") or 0)
 
             return {
@@ -896,14 +1043,16 @@ class DecisionEngine:
         if item_name in BLACKLIST:
             return False, "blacklisted"
 
-        if item_name.startswith((
-            "Sticker |",
-            "Patch |",
-            "Sealed Graffiti |",
-            "Graffiti |",
-            "Music Kit |",
-            "Pin |",
-        )):
+        if item_name.startswith(
+            (
+                "Sticker |",
+                "Patch |",
+                "Sealed Graffiti |",
+                "Graffiti |",
+                "Music Kit |",
+                "Pin |",
+            )
+        ):
             return False, f"excluded category: {item_name.split(' |')[0]}"
 
         # 2. Price range
@@ -914,7 +1063,10 @@ class DecisionEngine:
 
         # 3. Fair value availability
         if fair_value is None or fair_value < self.config.min_fair_value:
-            return False, f"fair value {fair_value}¢ below minimum {self.config.min_fair_value}¢"
+            return (
+                False,
+                f"fair value {fair_value}¢ below minimum {self.config.min_fair_value}¢",
+            )
 
         # 4. Volume / liquidity
         if volume < self.config.min_volume:
@@ -984,7 +1136,8 @@ class ExecutionModule:
             balance = data.get("balance") or (data.get("user") or {}).get("balance")
             if balance is None:
                 logger.warning(
-                    "balance field not found in /api/v1/me — available keys: %s", list(data.keys())
+                    "balance field not found in /api/v1/me — available keys: %s",
+                    list(data.keys()),
                 )
                 return False
             self._balance = int(balance)
@@ -992,7 +1145,12 @@ class ExecutionModule:
             self._last_balance_refresh = asyncio.get_event_loop().time()
             # Extract steam_id (needed for /users/{steam_id}/stall)
             user = data.get("user") or data
-            sid = user.get("steam_id") or user.get("steamid") or user.get("steamId") or user.get("id")
+            sid = (
+                user.get("steam_id")
+                or user.get("steamid")
+                or user.get("steamId")
+                or user.get("id")
+            )
             if sid and not self._steam_id:
                 self._steam_id = str(sid)
                 logger.info("Steam ID resolved: %s", self._steam_id)
@@ -1039,7 +1197,10 @@ class ExecutionModule:
             return False
 
         # Refresh balance if not loaded or stale
-        if not self._balance_loaded or (now - self._last_balance_refresh) > self.config.balance_refresh_interval:
+        if (
+            not self._balance_loaded
+            or (now - self._last_balance_refresh) > self.config.balance_refresh_interval
+        ):
             await self.refresh_balance()
 
         # Balance gate: skip if insufficient funds or would breach reserve
@@ -1047,15 +1208,19 @@ class ExecutionModule:
             if self._balance < price:
                 logger.warning(
                     "Insufficient balance: have $%.2f, need $%.2f for %r — skipping",
-                    self._balance / 100, price / 100, listing["item_name"],
+                    self._balance / 100,
+                    price / 100,
+                    listing["item_name"],
                 )
                 return False
             reserve = self.config.min_balance_reserve
             if (self._balance - price) < reserve:
                 logger.warning(
                     "Reserve guard: buying %r ($%.2f) would drop balance to $%.2f < reserve $%.2f — skipping",
-                    listing["item_name"], price / 100,
-                    (self._balance - price) / 100, reserve / 100,
+                    listing["item_name"],
+                    price / 100,
+                    (self._balance - price) / 100,
+                    reserve / 100,
                 )
                 return False
 
@@ -1071,10 +1236,17 @@ class ExecutionModule:
             logger.error("HTTP client error buying listing_id=%s: %s", listing_id, exc)
             return False
         except Exception as exc:
-            logger.error("Unexpected error buying listing_id=%s: %s", listing_id, exc, exc_info=True)
+            logger.error(
+                "Unexpected error buying listing_id=%s: %s",
+                listing_id,
+                exc,
+                exc_info=True,
+            )
             return False
 
-    async def _handle_response(self, resp: aiohttp.ClientResponse, listing: dict) -> bool:
+    async def _handle_response(
+        self, resp: aiohttp.ClientResponse, listing: dict
+    ) -> bool:
         listing_id = listing["listing_id"]
         status = resp.status
 
@@ -1087,7 +1259,9 @@ class ExecutionModule:
                 listing["price"],
                 f"{listing['fair_value']}¢" if listing.get("fair_value") else "n/a",
                 listing.get("buy_reason", ""),
-                f"{listing['float_value']:.6f}" if listing.get("float_value") is not None else "n/a",
+                f"{listing['float_value']:.6f}"
+                if listing.get("float_value") is not None
+                else "n/a",
                 listing_id,
                 self._balance / 100,
             )
@@ -1096,7 +1270,9 @@ class ExecutionModule:
                 try:
                     await self.on_buy_success(listing)
                 except Exception as exc:
-                    logger.error("on_buy_success callback failed: %s", exc, exc_info=True)
+                    logger.error(
+                        "on_buy_success callback failed: %s", exc, exc_info=True
+                    )
             return True
 
         body = await resp.text()
@@ -1104,23 +1280,32 @@ class ExecutionModule:
         if status == 400:
             try:
                 import json as _json
+
                 err = _json.loads(body)
                 code = err.get("code")
-                msg  = err.get("message", body)
+                msg = err.get("message", body)
             except Exception:
                 code, msg = None, body
             if code == 4:  # "already sold" — kapıldı
-                logger.info("Already sold: %r  listing_id=%s", listing["item_name"], listing_id)
+                logger.info(
+                    "Already sold: %r  listing_id=%s", listing["item_name"], listing_id
+                )
                 await self._notifier.send_buy_failed(listing, "Başkası kaptı")
             else:
-                logger.warning("Buy rejected (400 code=%s): %s  listing_id=%s", code, msg, listing_id)
+                logger.warning(
+                    "Buy rejected (400 code=%s): %s  listing_id=%s",
+                    code,
+                    msg,
+                    listing_id,
+                )
                 await self._notifier.send_buy_failed(listing, f"Reddedildi: {msg}")
             return False
 
         if status == 429:
             logger.warning(
                 "Rate limited (HTTP 429). Pausing %.0fs. listing_id=%s",
-                self.config.rate_limit_pause, listing_id,
+                self.config.rate_limit_pause,
+                listing_id,
             )
             self._rate_limited_until = (
                 asyncio.get_event_loop().time() + self.config.rate_limit_pause
@@ -1130,7 +1315,8 @@ class ExecutionModule:
         if status in (401, 403):
             logger.critical(
                 "AUTH FAILURE (HTTP %d) — credentials expired. Update .env and restart. body=%s",
-                status, body[:300],
+                status,
+                body[:300],
             )
             await self._notifier.send_error(
                 f"🔐 Satın alma auth hatası (HTTP {status})\n"
@@ -1139,7 +1325,12 @@ class ExecutionModule:
             return False
 
         reason = f"HTTP {status}"
-        logger.warning("Unexpected HTTP %d for listing_id=%s. body=%s", status, listing_id, body[:300])
+        logger.warning(
+            "Unexpected HTTP %d for listing_id=%s. body=%s",
+            status,
+            listing_id,
+            body[:300],
+        )
         await self._notifier.send_buy_failed(listing, reason)
         return False
 
@@ -1183,13 +1374,17 @@ class CsfloatClient:
     async def fetch_inventory(self) -> list[dict] | None:
         """GET /me/inventory. Returns list of items, or None on auth/network failure."""
         try:
-            async with self.session.get(self.config.inventory_url, headers=self._headers()) as resp:
+            async with self.session.get(
+                self.config.inventory_url, headers=self._headers()
+            ) as resp:
                 if resp.status in (401, 403):
                     logger.critical("Inventory AUTH FAILURE (HTTP %d)", resp.status)
                     return None
                 if resp.status != 200:
                     body = await resp.text()
-                    logger.warning("Inventory fetch HTTP %d: %s", resp.status, body[:200])
+                    logger.warning(
+                        "Inventory fetch HTTP %d: %s", resp.status, body[:200]
+                    )
                     return None
                 data = await resp.json()
         except aiohttp.ClientError as exc:
@@ -1244,8 +1439,10 @@ class CsfloatClient:
         except aiohttp.ClientError:
             return None
 
-        listings = payload if isinstance(payload, list) else (
-            payload.get("data") or payload.get("listings") or []
+        listings = (
+            payload
+            if isinstance(payload, list)
+            else (payload.get("data") or payload.get("listings") or [])
         )
         prices: list[int] = []
         for raw in listings:
@@ -1258,6 +1455,45 @@ class CsfloatClient:
             except (KeyError, TypeError, ValueError):
                 continue
         return min(prices) if prices else None
+
+    async def fetch_cheapest_listing(self, item_name: str) -> dict | None:
+        """Return the raw cheapest buy_now listing dict for ``item_name``.
+
+        Unlike :meth:`fetch_lowest_listing_price` this returns the full listing
+        (id, price, item, reference.quantity), so the momentum strategy can both
+        snapshot the price+volume AND buy that exact listing.
+        """
+        url = (
+            "https://csfloat.com/api/v1/listings"
+            f"?sort_by=lowest_price&limit=10&market_hash_name="
+            f"{url_quote(item_name, safe='')}"
+        )
+        try:
+            async with self.session.get(url, headers=self._headers()) as resp:
+                if resp.status != 200:
+                    return None
+                payload = await resp.json()
+        except aiohttp.ClientError:
+            return None
+
+        listings = (
+            payload
+            if isinstance(payload, list)
+            else (payload.get("data") or payload.get("listings") or [])
+        )
+        cheapest: dict | None = None
+        for raw in listings:
+            try:
+                if raw.get("type") == "auction" or raw.get("is_auction") is True:
+                    continue
+                if str(raw.get("item", {}).get("market_hash_name")) != item_name:
+                    continue
+                price = int(raw["price"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if cheapest is None or price < int(cheapest["price"]):
+                cheapest = raw
+        return cheapest
 
     async def create_listing(self, asset_id: str, price: int) -> tuple[str | None, str]:
         """
@@ -1291,9 +1527,13 @@ class CsfloatClient:
                         or data.get("listing_id")
                         or (data.get("listing") or {}).get("id")
                     )
-                    logger.info("CREATE LISTING ok status=%d body=%s", resp.status, text[:300])
+                    logger.info(
+                        "CREATE LISTING ok status=%d body=%s", resp.status, text[:300]
+                    )
                     return (str(listing_id) if listing_id else None), ""
-                logger.warning("CREATE LISTING failed status=%d body=%s", resp.status, text[:300])
+                logger.warning(
+                    "CREATE LISTING failed status=%d body=%s", resp.status, text[:300]
+                )
                 return None, f"HTTP {resp.status}: {text[:200]}"
         except aiohttp.ClientError as exc:
             return None, f"network error: {exc}"
@@ -1305,9 +1545,16 @@ class CsfloatClient:
             async with self.session.delete(url, headers=self._headers()) as resp:
                 text = await resp.text()
                 if resp.status in (200, 204):
-                    logger.info("DELETE LISTING ok id=%s status=%d", listing_id, resp.status)
+                    logger.info(
+                        "DELETE LISTING ok id=%s status=%d", listing_id, resp.status
+                    )
                     return True
-                logger.warning("DELETE LISTING failed id=%s status=%d body=%s", listing_id, resp.status, text[:200])
+                logger.warning(
+                    "DELETE LISTING failed id=%s status=%d body=%s",
+                    listing_id,
+                    resp.status,
+                    text[:200],
+                )
                 return False
         except aiohttp.ClientError as exc:
             logger.warning("DELETE LISTING network error id=%s: %s", listing_id, exc)
@@ -1322,7 +1569,12 @@ class CsfloatClient:
                     return None
                 if resp.status != 200:
                     body = await resp.text()
-                    logger.warning("fetch_contract HTTP %d for %s: %s", resp.status, contract_id, body[:200])
+                    logger.warning(
+                        "fetch_contract HTTP %d for %s: %s",
+                        resp.status,
+                        contract_id,
+                        body[:200],
+                    )
                     return None
                 return await resp.json()
         except aiohttp.ClientError as exc:
@@ -1369,10 +1621,20 @@ class PortfolioManager:
         _fv = listing.get("fair_value") or 0
         base_price = max(_bp, _fv) if max(_bp, _fv) > buy_price // 2 else buy_price
         float_value = listing.get("float_value")
+        strategy = listing.get("strategy", "sniper")
+        target_price = listing.get("target_price")
         pending_key = await self.tracker.add_pending(
-            contract_id, item_name, buy_price, base_price, float_value=float_value
+            contract_id,
+            item_name,
+            buy_price,
+            base_price,
+            float_value=float_value,
+            strategy=strategy,
+            target_price=target_price,
         )
-        asyncio.create_task(self._resolve_asset_for(pending_key, contract_id, item_name, buy_price))
+        asyncio.create_task(
+            self._resolve_asset_for(pending_key, contract_id, item_name, buy_price)
+        )
 
     async def _resolve_asset_for(
         self, pending_key: str, contract_id: str, item_name: str, buy_price: int
@@ -1390,12 +1652,17 @@ class PortfolioManager:
                 asset_id, unlock_iso = match
                 await self.tracker.resolve_asset(pending_key, asset_id, unlock_iso)
                 logger.info(
-                    "Resolved asset_id=%s for %r (unlock=%s)", asset_id, item_name, unlock_iso
+                    "Resolved asset_id=%s for %r (unlock=%s)",
+                    asset_id,
+                    item_name,
+                    unlock_iso,
                 )
                 return
             logger.info(
                 "Asset resolve attempt %d/%d: item %r not in inventory yet",
-                attempt + 1, self.config.inventory_resolve_retries, item_name,
+                attempt + 1,
+                self.config.inventory_resolve_retries,
+                item_name,
             )
             await asyncio.sleep(self.config.inventory_resolve_delay)
 
@@ -1445,6 +1712,25 @@ class PortfolioManager:
             if v:
                 return str(v)
         return ""
+
+    @staticmethod
+    def _extract_float(raw: dict) -> float | None:
+        for key in ("float_value", "float", "floatvalue"):
+            v = raw.get(key)
+            if v is not None:
+                try:
+                    return float(v)
+                except (TypeError, ValueError):
+                    pass
+        item = raw.get("item") or {}
+        for key in ("float_value", "float", "floatvalue"):
+            v = item.get(key)
+            if v is not None:
+                try:
+                    return float(v)
+                except (TypeError, ValueError):
+                    pass
+        return None
 
     @staticmethod
     def _extract_tradable_at(raw: dict) -> str | None:
@@ -1502,7 +1788,10 @@ class PortfolioManager:
         age_days = (datetime.now(timezone.utc) - listed_dt).days
         if age_days < self.config.phase_1_duration_days:
             return 1
-        if age_days < self.config.phase_1_duration_days + self.config.phase_2_duration_days:
+        if (
+            age_days
+            < self.config.phase_1_duration_days + self.config.phase_2_duration_days
+        ):
             return 2
         total = (
             self.config.phase_1_duration_days
@@ -1524,6 +1813,17 @@ class PortfolioManager:
 
     async def _price_for_phase(self, item: BoughtItem, phase: int) -> int:
         floor = int(item.buy_price * self.config.min_listing_markup)
+        # Momentum item'ları base_price markup ile değil, baseline'a (target_price)
+        # dönüşle satılır. Phase 3'te yine en ucuzdan undercut devreye girer.
+        if item.strategy == "momentum" and item.target_price:
+            if phase in (1, 2):
+                return max(floor, item.target_price)
+            if phase == 3:
+                lowest = await self.client.fetch_lowest_listing_price(item.item_name)
+                if lowest is None:
+                    return max(floor, item.target_price)
+                return max(floor, lowest - self.config.phase_3_undercut_cents)
+            return floor
         base = self._effective_base(item)
         if phase == 1:
             return max(floor, int(base * self.config.phase_1_markup))
@@ -1536,13 +1836,96 @@ class PortfolioManager:
             return max(floor, lowest - self.config.phase_3_undercut_cents)
         return floor  # phase 4 — shouldn't be called, but safe fallback
 
+    def _find_in_inventory(self, inventory: list[dict], item: BoughtItem) -> str | None:
+        """Return ``item``'s live asset_id in the current inventory, or None.
+
+        Steam reassigns an item's asset_id when its trade-hold expires, so the id
+        captured at buy time goes stale and CSFloat's listing API 403s with
+        "not found in your inventory". We re-match by market_hash_name (and float
+        when known, to disambiguate duplicates), skipping ids already claimed by
+        other tracked items. If the stored id is still present we keep it.
+        """
+        claimed = {
+            it.asset_id
+            for it in self.tracker.all()
+            if it.asset_id and it.asset_id != item.asset_id
+        }
+        best_id: str | None = None
+        best_delta: float | None = None
+        fallback_id: str | None = None
+        for raw in inventory:
+            aid = self._extract_asset_id(raw)
+            if not aid or aid in claimed:
+                continue
+            if self._extract_item_name(raw) != item.item_name:
+                continue
+            if item.asset_id and aid == item.asset_id:
+                return aid  # stored id still valid — nothing to do
+            if item.float_value is not None:
+                fv = self._extract_float(raw)
+                if fv is not None:
+                    delta = abs(fv - item.float_value)
+                    if best_delta is None or delta < best_delta:
+                        best_id, best_delta = aid, delta
+                    continue
+            if fallback_id is None:
+                fallback_id = aid
+        return best_id or fallback_id
+
+    async def _sync_asset_id(
+        self, item: BoughtItem, inventory: list[dict] | None
+    ) -> str | None:
+        """Resolve the current asset_id for ``item``, re-keying the tracker if it changed.
+
+        Returns the live asset_id to list with, or None if the item is no longer
+        in inventory (already listed, sold, or refunded) — in which case the
+        caller should skip rather than retry a dead id.
+        """
+        if inventory is None:
+            return item.asset_id  # couldn't fetch — fall back to stored id
+        live = self._find_in_inventory(inventory, item)
+        if live is None:
+            return None
+        if live != item.asset_id:
+            logger.info(
+                "asset_id changed for %r: %s → %s (trade-hold expired, re-keying)",
+                item.item_name,
+                item.asset_id,
+                live,
+            )
+            old_key = item.asset_id
+            await self.tracker.rekey_asset(old_key, live)
+            item.asset_id = live
+        return live
+
     async def list_unlocked(self) -> int:
         """List any locked items whose trade hold has expired. Returns count listed."""
         now = datetime.now(timezone.utc)
+        ready = [
+            item
+            for item in self.tracker.by_status("locked")
+            if (dt := self._parse_iso(item.trade_unlock_at)) is not None and dt <= now
+        ]
+        if not ready:
+            return 0
+        # Re-resolve asset_ids against the live inventory once per pass: Steam
+        # reassigns ids when the hold lifts, so the id stored at buy time is stale.
+        inventory = await self.client.fetch_inventory()
         count = 0
-        for item in self.tracker.by_status("locked"):
-            unlock_dt = self._parse_iso(item.trade_unlock_at)
-            if unlock_dt is None or unlock_dt > now:
+        for item in ready:
+            asset_id = await self._sync_asset_id(item, inventory)
+            if asset_id is None:
+                logger.warning(
+                    "List skip %r: not found in inventory (stale id=%s) — "
+                    "already listed/sold/refunded?",
+                    item.item_name,
+                    item.asset_id,
+                )
+                await self.tracker.update(
+                    item.asset_id,
+                    error_count=item.error_count + 1,
+                    last_error="item not in inventory",
+                )
                 continue
             price = await self._price_for_phase(item, phase=1)
             eff_base = self._effective_base(item)
@@ -1550,8 +1933,11 @@ class PortfolioManager:
                 pos = _float_tier_position(item.float_value, item.item_name)
                 logger.info(
                     "Float premium applied: %r float=%.4f pos=%.2f base %d→%d",
-                    item.item_name, item.float_value, pos or 0.0,
-                    item.base_price_at_buy, eff_base,
+                    item.item_name,
+                    item.float_value,
+                    pos or 0.0,
+                    item.base_price_at_buy,
+                    eff_base,
                 )
             listing_id, err = await self.client.create_listing(item.asset_id, price)
             if listing_id is None:
@@ -1587,7 +1973,10 @@ class PortfolioManager:
             if target == current:
                 continue
             if target == 4:
-                age = (datetime.now(timezone.utc) - (self._parse_iso(item.listed_at) or datetime.now(timezone.utc))).days
+                age = (
+                    datetime.now(timezone.utc)
+                    - (self._parse_iso(item.listed_at) or datetime.now(timezone.utc))
+                ).days
                 await self._notifier.send_stuck(item, days_listed=age)
                 await self.tracker.update(item.asset_id, current_phase=4)
                 continue
@@ -1598,6 +1987,20 @@ class PortfolioManager:
             # Delete + re-create (CSFloat doesn't support price update on existing listing universally)
             if item.listing_id_sell:
                 await self.client.delete_listing(item.listing_id_sell)
+            # Delisting returns the item to inventory, possibly under a new asset_id.
+            inventory = await self.client.fetch_inventory()
+            if await self._sync_asset_id(item, inventory) is None:
+                logger.warning(
+                    "Reprice skip %r: not found in inventory after delist (id=%s)",
+                    item.item_name,
+                    item.asset_id,
+                )
+                await self.tracker.update(
+                    item.asset_id,
+                    error_count=item.error_count + 1,
+                    last_error="item not in inventory after delist",
+                )
+                continue
             new_id, err = await self.client.create_listing(item.asset_id, new_price)
             if new_id is None:
                 logger.warning("Reprice failed for %r: %s", item.item_name, err)
@@ -1639,7 +2042,9 @@ class PortfolioManager:
                 continue
             # Listing gone from stall → sold
             list_price = item.list_price or 0
-            net = int(list_price * (1 - self.config.csfloat_seller_fee)) - item.buy_price
+            net = (
+                int(list_price * (1 - self.config.csfloat_seller_fee)) - item.buy_price
+            )
             await self.tracker.update(
                 item.asset_id,
                 status="sold",
@@ -1670,7 +2075,8 @@ class PortfolioManager:
             return 0
         logger.info(
             "retry_pending_trades: %d pending, inventory size=%d",
-            len(pending), len(inv),
+            len(pending),
+            len(inv),
         )
         # Exclude asset_ids already claimed by other tracker entries to avoid double-assignment
         claimed = {it.asset_id for it in self.tracker.all() if it.asset_id}
@@ -1695,24 +2101,28 @@ class PortfolioManager:
                 if raw_id and str(raw_id) not in claimed:
                     asset_id = str(raw_id)
                     # trade_unlock_at: prefer API field, fall back to buy_time + hold_days
-                    raw_unlock = (
-                        contract.get("item", {}).get("tradable_at")
-                        or contract.get("tradable_at")
-                    )
+                    raw_unlock = contract.get("item", {}).get(
+                        "tradable_at"
+                    ) or contract.get("tradable_at")
                     if raw_unlock:
                         try:
-                            parsed = datetime.fromisoformat(str(raw_unlock).replace("Z", "+00:00"))
+                            parsed = datetime.fromisoformat(
+                                str(raw_unlock).replace("Z", "+00:00")
+                            )
                             unlock_iso = (parsed + timedelta(days=1)).isoformat()
                         except ValueError:
                             pass
                     if unlock_iso is None:
                         unlock_iso = (
-                            bought_dt + timedelta(days=self.config.trade_hold_buffer_days)
+                            bought_dt
+                            + timedelta(days=self.config.trade_hold_buffer_days)
                         ).isoformat()
 
             # 2) Fall back to inventory match (works once trade hold clears)
             if asset_id is None:
-                match = self._match_inventory_item(inv, item.item_name, exclude_ids=claimed)
+                match = self._match_inventory_item(
+                    inv, item.item_name, exclude_ids=claimed
+                )
                 if match is not None:
                     asset_id, unlock_iso = match
 
@@ -1742,7 +2152,12 @@ class PortfolioManager:
         listed = await self.list_unlocked()
         sold = await self.detect_sales()
         repriced = await self.reprice_phases()
-        summary = {"resolved": resolved, "listed": listed, "sold": sold, "repriced": repriced}
+        summary = {
+            "resolved": resolved,
+            "listed": listed,
+            "sold": sold,
+            "repriced": repriced,
+        }
         logger.info("Portfolio catch-up complete: %s", summary)
         return summary
 
@@ -1837,7 +2252,12 @@ class MarketPoller:
             except Exception as exc:
                 logger.error("Poll unexpected error: %s", exc, exc_info=True)
             if self._running:
-                await asyncio.sleep(self.config.poll_interval)
+                # Sniper kapalıyken poller sadece watchlist'i besliyor — hızlı
+                # dönmesine gerek yok; sıkı rate-limit'i momentum'a bırak.
+                interval = self.config.poll_interval
+                if not self.config.sniper_enabled:
+                    interval = max(interval, self.config.poll_interval_idle)
+                await asyncio.sleep(interval)
 
     async def _poll(self) -> None:
         headers: dict[str, str] = {
@@ -1871,7 +2291,8 @@ class MarketPoller:
                     pause = min(60 * (2 ** (self._consecutive_429s - 1)), 600)
                     logger.warning(
                         "Poll rate limited (429) — waiting %.0fs (art arda %d)",
-                        pause, self._consecutive_429s,
+                        pause,
+                        self._consecutive_429s,
                     )
                     if self._consecutive_429s == 1:
                         await self._notifier.send_error(
@@ -1881,7 +2302,10 @@ class MarketPoller:
                     await asyncio.sleep(pause)
                     return
                 if resp.status in (401, 403):
-                    logger.critical("Poll AUTH FAILURE (HTTP %d) — update .env and restart", resp.status)
+                    logger.critical(
+                        "Poll AUTH FAILURE (HTTP %d) — update .env and restart",
+                        resp.status,
+                    )
                     await self._notifier.send_error(
                         f"🔐 Auth başarısız (HTTP {resp.status})\n"
                         ".env dosyasını güncelle ve botu yeniden başlat."
@@ -1906,7 +2330,9 @@ class MarketPoller:
                         if extra > 0:
                             logger.info(
                                 "Adaptive throttle: %d req left, reset in %.0fs → poll interval %.0fs",
-                                remaining, reset_in, ideal_interval,
+                                remaining,
+                                reset_in,
+                                ideal_interval,
                             )
                             await asyncio.sleep(extra)
                 except (ValueError, TypeError):
@@ -1934,7 +2360,9 @@ class MarketPoller:
                 try:
                     await self.on_listing(raw)
                 except Exception as exc:
-                    logger.error("Error processing listing %s: %s", lid, exc, exc_info=True)
+                    logger.error(
+                        "Error processing listing %s: %s", lid, exc, exc_info=True
+                    )
 
             # Stop paging: no cursor returned, or page 1+ had nothing new (caught up)
             if not next_cursor or (not found_new and page_num > 0):
@@ -1947,10 +2375,15 @@ class MarketPoller:
             self._initialized = True
             logger.info(
                 "Poller initialised — %d existing listing(s) seeded (%d page(s))",
-                total_seeded, page_num + 1,
+                total_seeded,
+                page_num + 1,
             )
         elif new_count:
-            logger.debug("Poll: %d new listing(s) evaluated across %d page(s)", new_count, page_num + 1)
+            logger.debug(
+                "Poll: %d new listing(s) evaluated across %d page(s)",
+                new_count,
+                page_num + 1,
+            )
 
     def _mark_seen(self, listing_id: str) -> None:
         if len(self._seen_queue) == self._seen_queue.maxlen:
@@ -1976,6 +2409,9 @@ class TradingBot:
         self._cmd_task: asyncio.Task | None = None
         self._tracker: BoughtItemsTracker | None = None
         self._portfolio: PortfolioManager | None = None
+        self._pricedb: PriceDB | None = None
+        self._momentum: MomentumStrategy | None = None
+        self._watch_seen: set[str] = set()
         self._background_tasks: list[asyncio.Task] = []
 
     async def run(self) -> None:
@@ -1999,13 +2435,28 @@ class TradingBot:
             )
             self._executor.on_buy_success = self._portfolio.on_buy_success
 
+            # Mean-reversion strateji katmanı (sniper'ın yanında, ayrı bütçe)
+            self._pricedb = PriceDB(data_dir / "price_history.db")
+            self._momentum = MomentumStrategy(
+                self.config,
+                session,
+                self._pricedb,
+                client,
+                self.engine,
+                self._executor,
+                self._tracker,
+                self._notifier,
+            )
+
             # Startup catch-up: list unlocked, detect sold, transition phases
             try:
                 summary = await self._portfolio.run_catch_up()
                 if summary["listed"] or summary["sold"] or summary["repriced"]:
                     logger.info(
                         "Startup catch-up: listed=%d sold=%d repriced=%d",
-                        summary["listed"], summary["sold"], summary["repriced"],
+                        summary["listed"],
+                        summary["sold"],
+                        summary["repriced"],
                     )
             except Exception as exc:
                 logger.error("Startup catch-up failed: %s", exc, exc_info=True)
@@ -2028,12 +2479,21 @@ class TradingBot:
                 asyncio.create_task(self._portfolio.sales_loop()),
                 asyncio.create_task(self._portfolio.repricing_loop()),
             ]
+            # Momentum loop'u her zaman başlar; flag'i çalışma anında kontrol
+            # eder, böylece /set momentum on/off canlı etki eder.
+            self._background_tasks.append(
+                asyncio.create_task(self._momentum.run_loop())
+            )
 
-            self._poller = MarketPoller(self.config, session, self._on_listing, self._notifier)
+            self._poller = MarketPoller(
+                self.config, session, self._on_listing, self._notifier
+            )
             try:
                 await self._poller.run()
             except Exception as exc:
-                await self._notifier.send_error(f"Beklenmeyen hata, bot durdu:\n<code>{exc}</code>")
+                await self._notifier.send_error(
+                    f"Beklenmeyen hata, bot durdu:\n<code>{exc}</code>"
+                )
                 raise
             finally:
                 for t in self._background_tasks:
@@ -2048,6 +2508,18 @@ class TradingBot:
     async def _on_listing(self, raw: dict) -> None:
         listing = self.engine.extract_listing_data(raw)
         if listing is None:
+            return
+
+        # Mean-reversion watchlist'i akan stream'den pasifçe besle (yeterli hacimliyse)
+        if self._pricedb is not None and self.config.mr_enabled:
+            name = listing["item_name"]
+            vol = listing.get("volume", 0)
+            if vol >= self.config.mr_min_volume and name not in self._watch_seen:
+                self._watch_seen.add(name)
+                await self._pricedb.add_to_watchlist(name, vol)
+
+        # Sniper kapalıysa burada dur (watchlist beslemesi yukarıda yine de çalıştı)
+        if not self.config.sniper_enabled:
             return
 
         # Bakiye-bazlı ön filtre: alamayacağımız item'ı sessizce atla
